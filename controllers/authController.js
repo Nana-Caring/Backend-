@@ -17,6 +17,10 @@ exports.register = async (req, res) => {
     // Create new user
     user = await User.create({ name, email, password: hashedPassword, role });
 
+    // Remove password from user object before sending response
+    user = user.get({ plain: true });
+    delete user.password;
+
     // Return success response
     res.status(201).json({ message: "User registered successfully", user });
   } catch (error) {
@@ -40,20 +44,17 @@ exports.login = async (req, res) => {
     // Generate JWT token
     const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-    res.json({ token, user });
+    // Remove password from user object before sending response
+    const userData = user.get({ plain: true });
+    delete userData.password;
+
+    res.json({ token, user: userData });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Get current logged-in user
-exports.getUser = async (req, res) => {
-  try {
-    const user = await User.findByPk(req.user.id); // Use user ID from JWT payload
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
+// Get current user (for the "me" route)
+exports.getUser = (req, res) => {
+  res.json({ user: req.user }); // Return the user attached to the request object
 };

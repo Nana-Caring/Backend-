@@ -1,12 +1,24 @@
 // controllers/userController.js
-
-// Dummy data for illustration (replace with real logic)
-const getUser = (req, res) => {
-    // For now, we're assuming the user is available via the JWT token in `req.user`
-    res.json({ message: "This is the user info", user: req.user });
-  };
+exports.getUser = async (req, res) => {
+    try {
+      // Assuming the user's ID is stored in `req.user.id` by the `authMiddleware`
+      const userId = req.user.id;
   
-  module.exports = {
-    getUser
+      // Fetch user from the database (adjust based on your model and ORM)
+      const user = await User.findByPk(userId);
+  
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+  
+      // Return the user data without sensitive fields like password
+      const userData = user.get({ plain: true });
+      delete userData.password;
+  
+      res.json(userData);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Server error", error: error.message });
+    }
   };
   
