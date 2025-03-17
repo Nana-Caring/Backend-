@@ -21,4 +21,18 @@ exports.getUser = async (req, res) => {
       res.status(500).json({ message: "Server error", error: error.message });
     }
   };
+
+  //retrieve all the users
+  exports.getUsers = async (req, res) => {
+    try {
+        // Fetch all users, excluding passwords
+        const users = await User.findAll({
+            attributes: { exclude: ["password"] }
+        });
+
+        res.status(200).json(users);
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
   
