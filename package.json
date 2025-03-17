@@ -25,5 +25,8 @@
     "pg": "^8.14.0",
     "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.6"
+  },
+  "devDependencies": {
+    "madge": "^8.0.0"
   }
 }
