@@ -1,19 +1,55 @@
-const express = require("express");
-const { Account } = require("../models");
-const { authenticate, authorize } = require("../middlewares/authMiddleware");
+const { v4: uuidv4 } = require('uuid');
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
 
-const router = express.Router();
-
-// Create Accounts for a Child
-router.post("/create", authenticate, authorize(["Funder"]), async (req, res) => {
-  const { userId, type } = req.body;
-
-  try {
-    const account = await Account.create({ userId, type });
-    res.json({ message: "Account created!", account });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
+const Account = sequelize.define('Account', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: uuidv4,
+    primaryKey: true,
+  },
+  userId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+  },
+  accountName: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  accountNumber: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true, // Ensures account numbers are unique
+  },
+  balance: {
+    type: DataTypes.FLOAT,
+    defaultValue: 0,
+  },
+  currency: {
+    type: DataTypes.STRING(3),
+    defaultValue: 'ZAR',
+    allowNull: false,
+  },
+  status: {
+    type: DataTypes.ENUM('active', 'inactive', 'frozen'),
+    defaultValue: 'active',
+    allowNull: false,
+  },
+  creationDate: {
+    type: DataTypes.DATEONLY,
+    defaultValue: DataTypes.NOW,
+    allowNull: false,
+  },
+  lastTransactionDate: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  parentAccountId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
+}, {
+  timestamps: true,
 });
 
-module.exports = router;
+module.exports = Account;
