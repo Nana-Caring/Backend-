@@ -1,11 +1,25 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const Account = require("../models/Account");
+const { Sequelize, Op } = require('sequelize');
+// const generateUniqueAccountNumber = require('../utils/generateUniqueAccountNumber');
+const { generateUniqueAccountNumber } = require('../utils/generateUniqueAccountNumber');
 
-// Register new user
+// Register new user (funder or caregiver)
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { firstName, lastName, surname, email, password, role, Idnumber } = req.body;
+
+    // Validate role
+    if (!["funder", "caregiver"].includes(role)) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
+
+    // Validate ID number
+    if (!Idnumber || !/^\d{13}$/.test(Idnumber)) {
+      return res.status(400).json({ message: "Valid 13-digit numeric ID number required" });
+    }
 
     // Check if user already exists
     let user = await User.findOne({ where: { email } });
@@ -14,16 +28,169 @@ exports.register = async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user
-    user = await User.create({ name, email, password: hashedPassword, role });
+    // Create new user with ID number
+    user = await User.create({ 
+      firstName, 
+      lastName, 
+      surname, 
+      email, 
+      password: hashedPassword, 
+      role,
+      Idnumber 
+    });
 
-    // Remove password from user object before sending response
-    user = user.get({ plain: true });
-    delete user.password;
+    // Remove sensitive data from response
+    const userResponse = user.get({ plain: true });
+    delete userResponse.password;
 
-    // Return success response
-    res.status(201).json({ message: "User registered successfully", user });
+    res.status(201).json({ 
+      message: "User registered successfully", 
+      user: userResponse 
+    });
   } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Register dependent (called by caregiver)
+exports.registerDependent = async (req, res) => {
+  try {
+    const { firstName, lastName, surname, email, password, Idnumber, relation } = req.body;
+    const caregiverId = req.user.id;
+
+    // Validate required fields
+    if (!firstName || !lastName || !email || !password || !Idnumber || !relation) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    // Validate ID number
+    if (!/^\d{13}$/.test(Idnumber)) {
+      return res.status(400).json({ message: 'Valid 13-digit numeric ID number required' });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Valid email address required' });
+    }
+
+    // Verify caregiver status
+    const caregiver = await User.findByPk(caregiverId);
+    if (!caregiver || caregiver.role !== 'caregiver') {
+      return res.status(403).json({ message: 'Only caregivers can register dependents' });
+    }
+
+    // Check if email or ID number already exists
+    const existingUser = await User.findOne({
+      where: {
+        [Op.or]: [{ email }, { Idnumber }],
+      },
+    });
+    if (existingUser) {
+      return res.status(409).json({ message: 'Email or ID number already in use' });
+    }
+
+    // Hash password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Create dependent
+    const dependent = await User.create({
+      firstName,
+      lastName,
+      surname,
+      email,
+      password: hashedPassword,
+      Idnumber,
+      relation,
+      role: 'dependent',
+    });
+
+    // Generate unique account number for main account
+    const mainAccountNumber = await generateUniqueAccountNumber();
+
+    // Create main account for dependent
+    const mainAccount = await Account.create({
+      userId: dependent.id,
+      accountType: 'Main',
+      balance: 0,
+      parentAccountId: null,
+      accountNumber: mainAccountNumber,
+    });
+// main account, baby care account, entertainment account, clothing account,
+//  savings account, pregnancy account (no restrictions)
+
+    // Create sub-accounts for dependent
+    const subAccountTypes = ['Education', 'Healthcare', 'Clothing', 'Entertainment','Baby Care','Pregnancy' ,'Savings' ];
+    const subAccounts = await Promise.all(
+      subAccountTypes.map(async (type) => {
+        const subAccountNumber = await generateUniqueAccountNumber();
+        return Account.create({
+          userId: dependent.id,
+          accountType: type,
+          balance: 0,
+          parentAccountId: mainAccount.id,
+          accountNumber: subAccountNumber,
+        });
+      })
+    );
+
+    res.status(201).json({
+      message: 'Dependent registered successfully',
+      dependent: {
+        ...dependent.get({ plain: true }),
+        password: undefined, // Exclude password from response
+      },
+      accounts: [mainAccount, ...subAccounts],
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Updated getUser and getDependents endpoints
+exports.getUser = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id, {
+      attributes: { exclude: ["password"] },
+      include: [
+        {
+          model: Account,
+          as: "accounts",
+          attributes: ["id", "accountType", "balance", "parentAccountId"]
+        }
+      ]
+    });
+
+    res.json({ user });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+exports.getDependents = async (req, res) => {
+  try {
+    const caregiver = await User.findByPk(req.user.id);
+    if (!caregiver || caregiver.role !== 'caregiver') {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    const dependents = await User.findAll({
+      where: { role: 'dependent' },
+      attributes: { exclude: ["password"] },
+      include: [{
+        model: Account,
+        as: "accounts",
+        attributes: ["id", "accountType", "balance", "parentAccountId"]
+      }]
+    });
+
+    res.json({ dependents });
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
@@ -50,11 +217,7 @@ exports.login = async (req, res) => {
 
     res.json({ token, user: userData });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
-};
-
-// Get current user (for the "me" route)
-exports.getUser = (req, res) => {
-  res.json({ user: req.user }); // Return the user attached to the request object
 };
