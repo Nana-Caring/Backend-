@@ -3,18 +3,35 @@
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    await queryInterface.addColumn('Accounts', 'parentAccountId', {
-      type: Sequelize.UUID,
-      allowNull: false,
-      references: {
-        model: 'Accounts',
-        key: 'id',
-      },
-      onDelete: 'SET NULL',
-    });
+    try {
+      // Check if column exists
+      const tableInfo = await queryInterface.describeTable('Accounts');
+      if (!tableInfo.parentAccountId) {
+        await queryInterface.addColumn('Accounts', 'parentAccountId', {
+          type: Sequelize.UUID,
+          allowNull: true,
+          references: {
+            model: 'Accounts',
+            key: 'id',
+          },
+          onDelete: 'SET NULL',
+        });
+      }
+    } catch (error) {
+      console.error('Migration error:', error);
+      throw error;
+    }
   },
 
   down: async (queryInterface, Sequelize) => {
-    await queryInterface.removeColumn('Accounts', 'parentAccountId');
+    try {
+      const tableInfo = await queryInterface.describeTable('Accounts');
+      if (tableInfo.parentAccountId) {
+        await queryInterface.removeColumn('Accounts', 'parentAccountId');
+      }
+    } catch (error) {
+      console.error('Migration error:', error);
+      throw error;
+    }
   },
 };

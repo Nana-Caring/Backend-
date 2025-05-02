@@ -4,11 +4,10 @@
 module.exports = {
   up: async (queryInterface, Sequelize) => {
     try {
-      await queryInterface.addColumn('Accounts', 'accountNumber', {
-        type: Sequelize.STRING,
+      await queryInterface.addColumn('Accounts', 'creationDate', {
+        type: Sequelize.DATEONLY,
         allowNull: false,
-        unique: true,
-        defaultValue: Sequelize.UUIDV4,
+        defaultValue: Sequelize.NOW,
       });
     } catch (error) {
       console.error('Migration error:', error);
@@ -18,7 +17,7 @@ module.exports = {
 
   down: async (queryInterface, Sequelize) => {
     try {
-      await queryInterface.removeColumn('Accounts', 'accountNumber');
+      await queryInterface.removeColumn('Accounts', 'creationDate');
     } catch (error) {
       console.error('Migration error:', error);
       throw error;
