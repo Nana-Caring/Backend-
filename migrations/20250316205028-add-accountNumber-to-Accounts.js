@@ -1,14 +1,27 @@
+'use strict';
+
+/** @type {import('sequelize-cli').Migration} */
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    await queryInterface.addColumn('Accounts', 'accountNumber', {
-      type: Sequelize.STRING,
-      allowNull: false, // Set to true if the column can be null
-      unique: true, // Ensures account numbers are unique
-      defaultValue: Sequelize.UUIDV4, // Generates a unique identifier by default
-    });
+    try {
+      await queryInterface.addColumn('Accounts', 'accountNumber', {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true,
+        defaultValue: Sequelize.UUIDV4,
+      });
+    } catch (error) {
+      console.error('Migration error:', error);
+      throw error;
+    }
   },
 
   down: async (queryInterface, Sequelize) => {
-    await queryInterface.removeColumn('Accounts', 'accountNumber');
+    try {
+      await queryInterface.removeColumn('Accounts', 'accountNumber');
+    } catch (error) {
+      console.error('Migration error:', error);
+      throw error;
+    }
   }
 };
