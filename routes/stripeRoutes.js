@@ -1,13 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const Stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const auth = require('../middlewares/auth');
 const stripeController = require('../controllers/stripeController');
 
-router.post('create-payment-intent', stripeController.createPaymentIntent);
+// Payment intent route - requires authentication
+router.post('/create-payment-intent', auth, stripeController.createPaymentIntent);
 
-
-router.post('/webhook', express.raw({ type: 'application/json'}), stripeController.handleWebhook);
-
-  
+// Webhook route - no authentication needed as it's called by Stripe
+router.post('/webhook', express.raw({ type: 'application/json' }), stripeController.handleWebhook);
 
 module.exports = router;
