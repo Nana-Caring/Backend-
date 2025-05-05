@@ -21,6 +21,7 @@ const Account = sequelize.define('Account', {
     allowNull: false,
     unique: true, // Ensures account numbers are unique
   },
+  
   balance: {
     type: DataTypes.FLOAT,
     defaultValue: 0,
