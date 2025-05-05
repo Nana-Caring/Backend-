@@ -21,7 +21,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes); // Ensure this is working
 app.use(express.json()); //normal JSON parser for API requests
 app.use("/api/stripe", stripeRoutes); // Ensure this is working
-app.use('/stripe', webhookRoutes) //webhook
+app.use("/api/stripe/webhook", express.raw({ type: "application/json"})) //webhook
 
 //Test route
 app.get("/", (req, res) => {
