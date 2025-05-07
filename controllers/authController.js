@@ -198,26 +198,60 @@ exports.getDependents = async (req, res) => {
 // Login user
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+      const { email, password } = req.body;
 
-    // Check if user exists
-    const user = await User.findOne({ where: { email } });
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+      // Find user by email with associated accounts using the alias
+      const user = await User.findOne({ 
+          where: { email },
+          include: [{
+              model: Account,
+              as: 'accounts', // Use the alias defined in associations
+              attributes: ['id', 'accountNumber', 'accountType', 'balance', 'status', 'currency']
+          }]
+      });
 
-    // Compare password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+      if (!user) {
+          return res.status(401).json({ error: 'Invalid credentials' });
+      }
 
-    // Generate JWT token
-    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1h" });
+      // Check password
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+          return res.status(401).json({ error: 'Invalid credentials' });
+      }
 
-    // Remove password from user object before sending response
-    const userData = user.get({ plain: true });
-    delete userData.password;
+      // Generate JWT token
+      const token = jwt.sign(
+          { id: user.id, role: user.role },
+          process.env.JWT_SECRET,
+          { expiresIn: '1h' }
+      );
 
-    res.json({ token, user: userData });
+      // Format response
+      const response = {
+          token,
+          user: {
+              id: user.id,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              surname: user.surname,
+              email: user.email,
+              role: user.role,
+              Idnumber: user.Idnumber,
+              relation: user.relation,
+              createdAt: user.createdAt,
+              updatedAt: user.updatedAt
+          }
+      };
+
+      // Add accounts if user is dependent
+      if (user.role === 'dependent' && user.accounts) {
+          response.accounts = user.accounts;
+      }
+
+      res.json(response);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error", error: error.message });
+      console.error('Login error:', error);
+      res.status(500).json({ error: 'Login failed' });
   }
 };

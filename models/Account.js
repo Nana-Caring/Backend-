@@ -1,8 +1,10 @@
+const { Model, DataTypes } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
-const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
-const Account = sequelize.define('Account', {
+class Account extends Model {}
+
+Account.init({
   id: {
     type: DataTypes.UUID,
     defaultValue: uuidv4,
@@ -22,7 +24,7 @@ const Account = sequelize.define('Account', {
     unique: true,
   },
   balance: {
-    type: DataTypes.FLOAT,
+    type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0,
   },
   currency: {
@@ -47,9 +49,12 @@ const Account = sequelize.define('Account', {
   parentAccountId: {
     type: DataTypes.UUID,
     allowNull: true,
-  },
+  }
 }, {
-  timestamps: true,
+  sequelize,
+  modelName: 'Account',
+  tableName: 'Accounts',
+  timestamps: true
 });
 
 module.exports = Account;

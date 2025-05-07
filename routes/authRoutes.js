@@ -5,6 +5,16 @@ const authMiddleware = require("../middlewares/auth");
 
 const router = express.Router();
 
+// LOGIN
+router.post(
+  "/login",
+  [
+    check("email", "Include a valid email").isEmail(),
+    check("password", "Password is required").exists(),
+  ],
+  login
+);
+
 // REGISTER (Funder or Caregiver)
 router.post(
   "/register",
@@ -32,16 +42,6 @@ router.post(
     check("relation", "Relation is required").not().isEmpty(),
   ],
   registerDependent
-);
-
-// LOGIN
-router.post(
-  "/login",
-  [
-    check("email", "Include a valid email").isEmail(),
-    check("password", "Password is required").exists(),
-  ],
-  login
 );
 
 // GET CURRENT USER
