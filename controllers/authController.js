@@ -16,19 +16,29 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "Invalid role" });
     }
 
-    // Validate ID number
-    if (!Idnumber || !/^\d{13}$/.test(Idnumber)) {
-      return res.status(400).json({ message: "Valid 13-digit numeric ID number required" });
+    // Check if user already exists (by email or ID number)
+    let existingUser = await User.findOne({ 
+      where: {
+        [Op.or]: [
+          { email },
+          { Idnumber }
+        ]
+      } 
+    });
+    
+    if (existingUser) {
+      if (existingUser.email === email) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+      if (existingUser.Idnumber === Idnumber) {
+        return res.status(400).json({ message: "ID number already exists" });
+      }
     }
-
-    // Check if user already exists
-    let user = await User.findOne({ where: { email } });
-    if (user) return res.status(400).json({ message: "User already exists" });
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user with ID number
+    // Create new user
     user = await User.create({ 
       firstName, 
       lastName, 
@@ -62,11 +72,6 @@ exports.registerDependent = async (req, res) => {
     // Validate required fields
     if (!firstName || !lastName || !email || !password || !Idnumber || !relation) {
       return res.status(400).json({ message: 'All fields are required' });
-    }
-
-    // Validate ID number
-    if (!/^\d{13}$/.test(Idnumber)) {
-      return res.status(400).json({ message: 'Valid 13-digit numeric ID number required' });
     }
 
     // Validate email format
