@@ -9,7 +9,7 @@ exports.createPaymentIntent = async (req, res) => {
         const { account_number, amount } = req.body;
 
         if(!account_number || !amount){
-            return res.statuc(400),json({ message: 'Account number and amount are required.' });
+            return res.status(400),json({ message: 'Account number and amount are required.' });
         }
     
         if( amount < 2000){
@@ -44,52 +44,43 @@ exports.createPaymentIntent = async (req, res) => {
 
 };
 
-//Handle Stripe Webhooks
-exports.handleWebhook = async (req, res) =>{
+// Handle Stripe Webhooks
+exports.handleWebhook = async (req, res) => {
     const sig = req.headers['stripe-signature'];
     let event;
-
 
     try {
         event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
     } catch (err) {
         console.log('Webhook signature verification failed.', err.message);
-        return res.status(400).send('Webhook Error: ${err.message}');
+        return res.status(400).send(`Webhook Error: R{err.message}`);
     }
 
     // Handling successful payment intent
-    if(event.type == 'payment_intent.secceded'){
+    if (event.type === 'payment_intent.succeeded') {
         const paymentIntent = event.data.object;
-
         const accountNumber = paymentIntent.metadata.account_number;
         const amount = paymentIntent.amount / 100; // Convert cents to ZAR
 
-
-    
-        try{
-
-            //update the account balance in the database
+        try {
+            // Update the account balance in the database
             const account = await Account.findOne({ where: { accountNumber } });
 
-            if(!account){
-                console.error('Account {acoountNumber} not found.');
+            if (!account) {
+                console.error(`Account ${accountNumber} not found.`);
                 return res.status(404).end();
             }
 
             account.balance += amount;
             await account.save();
 
-
-            console.log('Payment succeeded for account: {accountNumber}, Amount: {amount}');
-
-        }catch(err){
+            console.log(`Payment succeeded for account: R{accountNumber}, Amount: R{amount}`);
+        } catch (err) {
             console.error('Database error:', err.message);
         }
-        
-
     }
 
     res.status(200).end();
-}
+};
 
-module.exports = { createPaymentIntent };``
+module.exports = { createPaymentIntent, handleWebhook };
