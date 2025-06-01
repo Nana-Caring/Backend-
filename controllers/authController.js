@@ -16,19 +16,29 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "Invalid role" });
     }
 
-    // Validate ID number
-    if (!Idnumber || !/^\d{13}$/.test(Idnumber)) {
-      return res.status(400).json({ message: "Valid 13-digit numeric ID number required" });
+    // Check if user already exists (by email or ID number)
+    let existingUser = await User.findOne({ 
+      where: {
+        [Op.or]: [
+          { email },
+          { Idnumber }
+        ]
+      } 
+    });
+    
+    if (existingUser) {
+      if (existingUser.email === email) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+      if (existingUser.Idnumber === Idnumber) {
+        return res.status(400).json({ message: "ID number already exists" });
+      }
     }
-
-    // Check if user already exists
-    let user = await User.findOne({ where: { email } });
-    if (user) return res.status(400).json({ message: "User already exists" });
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user with ID number
+    // Create new user
     user = await User.create({ 
       firstName, 
       lastName, 
@@ -62,11 +72,6 @@ exports.registerDependent = async (req, res) => {
     // Validate required fields
     if (!firstName || !lastName || !email || !password || !Idnumber || !relation) {
       return res.status(400).json({ message: 'All fields are required' });
-    }
-
-    // Validate ID number
-    if (!/^\d{13}$/.test(Idnumber)) {
-      return res.status(400).json({ message: 'Valid 13-digit numeric ID number required' });
     }
 
     // Validate email format
@@ -198,26 +203,60 @@ exports.getDependents = async (req, res) => {
 // Login user
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+      const { email, password } = req.body;
 
-    // Check if user exists
-    const user = await User.findOne({ where: { email } });
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+      // Find user by email with associated accounts using the alias
+      const user = await User.findOne({ 
+          where: { email },
+          include: [{
+              model: Account,
+              as: 'accounts', // Use the alias defined in associations
+              attributes: ['id', 'accountNumber', 'accountType', 'balance', 'status', 'currency']
+          }]
+      });
 
-    // Compare password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+      if (!user) {
+          return res.status(401).json({ error: 'Invalid credentials' });
+      }
 
-    // Generate JWT token
-    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1h" });
+      // Check password
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+          return res.status(401).json({ error: 'Invalid credentials' });
+      }
 
-    // Remove password from user object before sending response
-    const userData = user.get({ plain: true });
-    delete userData.password;
+      // Generate JWT token
+      const token = jwt.sign(
+          { id: user.id, role: user.role },
+          process.env.JWT_SECRET,
+          { expiresIn: '1h' }
+      );
 
-    res.json({ token, user: userData });
+      // Format response
+      const response = {
+          token,
+          user: {
+              id: user.id,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              surname: user.surname,
+              email: user.email,
+              role: user.role,
+              Idnumber: user.Idnumber,
+              relation: user.relation,
+              createdAt: user.createdAt,
+              updatedAt: user.updatedAt
+          }
+      };
+
+      // Add accounts if user is dependent
+      if (user.role === 'dependent' && user.accounts) {
+          response.accounts = user.accounts;
+      }
+
+      res.json(response);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error", error: error.message });
+      console.error('Login error:', error);
+      res.status(500).json({ error: 'Login failed' });
   }
 };

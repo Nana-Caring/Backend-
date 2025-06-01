@@ -1,86 +1,73 @@
 const Account = require('../models/Account');
-
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-exports.createPaymentIntent = async (req, res) => {
-    try{
+const createPaymentIntent = async (req, res) => {
+    try {
+        const { amount, currency = 'zar' } = req.body;
 
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(amount * 100),
+            currency: currency.toLowerCase(),
+        });
 
-        const { account_number, amount } = req.body;
-
-        if(!account_number || !amount){
-            return res.status(400),json({ message: 'Account number and amount are required.' });
-        }
-    
-        if( amount < 2000){
-            return res.status(400).json({message: 'The minimum amount you can send is R20.00'});
-        }
-    
-    
-
-    //payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-        amount,
-        currency: 'ZAR',
-        metadata: {
-            account_number: account_number,
-        },
-        payment_method_types: ['card'],
-        description: 'Payment for account number: ' + account_number,
-        
-    });
-    res.status(200).json({
-        clientSecret: paymentIntent.client_secret,
-        message: 'Payment intent created successfully',
-
-    });
-
-}catch(error){
-    console.error('Payment intent creation error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-}
-
-   
-
+        res.json({
+            clientSecret: paymentIntent.client_secret,
+        });
+    } catch (error) {
+        console.error('Payment Intent Error:', error);
+        res.status(500).json({ error: 'Failed to create payment intent' });
+    }
 };
 
-// Handle Stripe Webhooks
-exports.handleWebhook = async (req, res) => {
+const handleWebhook = async (req, res) => {
     const sig = req.headers['stripe-signature'];
     let event;
 
     try {
-        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-    } catch (err) {
-        console.log('Webhook signature verification failed.', err.message);
-        return res.status(400).send(`Webhook Error: R{err.message}`);
-    }
+        event = stripe.webhooks.constructEvent(
+            req.body,
+            sig,
+            process.env.STRIPE_WEBHOOK_SECRET
+        );
 
-    // Handling successful payment intent
-    if (event.type === 'payment_intent.succeeded') {
-        const paymentIntent = event.data.object;
-        const accountNumber = paymentIntent.metadata.account_number;
-        const amount = paymentIntent.amount / 100; // Convert cents to ZAR
+        // Handle the event
+        switch (event.type) {
+            case 'payment_intent.succeeded':
+                // Handle successful payment
+                const paymentIntent = event.data.object;
 
-        try {
-            // Update the account balance in the database
-            const account = await Account.findOne({ where: { accountNumber } });
+                const accountNumber = paymentIntent.metadata.account_number;
+                const amount = paymentIntent.amount / 100; // Convert cents to ZAR
 
-            if (!account) {
-                console.error(`Account ${accountNumber} not found.`);
-                return res.status(404).end();
-            }
+                try {
+                    // Update the account balance in the database
+                    const account = await Account.findOne({ where: { accountNumber } });
 
-            account.balance += amount;
-            await account.save();
+                    if (!account) {
+                        console.error(`Account ${accountNumber} not found.`);
+                        return res.status(404).end();
+                    }
 
-            console.log(`Payment succeeded for account: R{accountNumber}, Amount: R{amount}`);
-        } catch (err) {
-            console.error('Database error:', err.message);
+                    account.balance += amount;
+                    await account.save();
+
+                    console.log(`Payment succeeded for account: ${accountNumber}, Amount: ${amount}`);
+                } catch (err) {
+                    console.error('Database error:', err.message);
+                }
+                break;
+            default:
+                console.log(`Unhandled event type ${event.type}`);
         }
-    }
 
-    res.status(200).end();
+        res.json({ received: true });
+    } catch (err) {
+        console.error('Webhook Error:', err.message);
+        res.status(400).json({ error: `Webhook Error: ${err.message}` });
+    }
 };
 
-module.exports = { createPaymentIntent, handleWebhook };
+module.exports = {
+    createPaymentIntent,
+    handleWebhook
+};
