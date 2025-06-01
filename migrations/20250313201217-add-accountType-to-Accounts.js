@@ -1,45 +1,58 @@
 // migrations/xxxxxx-update-account-type-column.js
 'use strict';
 
+/** @type {import('sequelize-cli').Migration} */
 module.exports = {
-  up: async (queryInterface, Sequelize) => {
-    // Change the accountType column to STRING and set allowNull to false
-    await queryInterface.changeColumn('Accounts', 'accountType', {
-      type: Sequelize.STRING,
-      allowNull: false,
-    });
+  async up(queryInterface, Sequelize) {
+    try {
+      // First create the table if it doesn't exist
+      await queryInterface.createTable('Accounts', {
+        id: {
+          allowNull: false,
+          autoIncrement: true,
+          primaryKey: true,
+          type: Sequelize.INTEGER
+        },
+        userId: {
+          type: Sequelize.INTEGER,
+          allowNull: false
+        },
+        accountType: {
+          type: Sequelize.STRING,
+          allowNull: false
+        },
+        balance: {
+          type: Sequelize.DECIMAL(10, 2),
+          defaultValue: 0.00
+        },
+        parentAccountId: {
+          type: Sequelize.INTEGER,
+          allowNull: true
+        },
+        createdAt: {
+          allowNull: false,
+          type: Sequelize.DATE,
+          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+        },
+        updatedAt: {
+          allowNull: false,
+          type: Sequelize.DATE,
+          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+        }
+      });
+    } catch (error) {
+      console.error('Migration up error:', error);
+      throw error;
+    }
   },
 
-  down: async (queryInterface, Sequelize) => {
-    // Revert the accountType column to its original state if needed
-    await queryInterface.changeColumn('Accounts', 'accountType', {
-      type: Sequelize.STRING,
-      allowNull: true,
-    });
+  async down(queryInterface, Sequelize) {
+    try {
+      // Drop the table in the down migration
+      await queryInterface.dropTable('Accounts');
+    } catch (error) {
+      console.error('Migration down error:', error);
+      throw error;
+    }
   }
-
-
-  
 };
-// Inside your registration logic
-if (role === "caregiver") {
-  // Create the main account
-  const mainAccount = await Account.create({
-    userId: user.id,
-    accountType: "Main", // Ensure this is provided
-    balance: 0,
-    parentAccountId: null, // Main account has no parent
-  });
-
-  // Define subaccount types
-  const subAccountTypes = ["Baby Care", "Entertainment", "Clothing", "Savings", "Pregnancy"];
-  const subAccounts = subAccountTypes.map(type => ({
-    userId: user.id,
-    accountType: type, // Ensure this is provided
-    balance: 0,
-    parentAccountId: mainAccount.id, // Link to Main Account
-  }));
-
-  // Create subaccounts in bulk
-  await Account.bulkCreate(subAccounts);
-}
