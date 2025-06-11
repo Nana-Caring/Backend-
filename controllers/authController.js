@@ -9,7 +9,7 @@ const { generateUniqueAccountNumber } = require('../utils/generateUniqueAccountN
 // Register new user (funder or caregiver)
 exports.register = async (req, res) => {
   try {
-    const { firstName, lastName, surname, email, password, role, Idnumber } = req.body;
+    const { firstName, middleName, surname, email, password, role, Idnumber } = req.body;
 
     // Validate role
     if (!["funder", "caregiver"].includes(role)) {
@@ -41,7 +41,7 @@ exports.register = async (req, res) => {
     // Create new user
     user = await User.create({ 
       firstName, 
-      lastName, 
+      middleName, 
       surname, 
       email, 
       password: hashedPassword, 
