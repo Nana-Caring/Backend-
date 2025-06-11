@@ -66,12 +66,12 @@ exports.register = async (req, res) => {
 // Register dependent (called by caregiver)
 exports.registerDependent = async (req, res) => {
   try {
-    const { firstName, lastName, surname, email, password, Idnumber, relation } = req.body;
+    const { firstName, middleName, surname, email, password, Idnumber, relation } = req.body;
     const caregiverId = req.user.id;
 
-    // Validate required fields
-    if (!firstName || !lastName || !email || !password || !Idnumber || !relation) {
-      return res.status(400).json({ message: 'All fields are required' });
+    // Validate required fields (middleName is now optional)
+    if (!firstName || !email || !password || !Idnumber || !relation) {
+      return res.status(400).json({ message: 'Required fields are missing' });
     }
 
     // Validate email format
@@ -103,7 +103,7 @@ exports.registerDependent = async (req, res) => {
     // Create dependent
     const dependent = await User.create({
       firstName,
-      lastName,
+      middleName,  // Optional field
       surname,
       email,
       password: hashedPassword,
@@ -238,6 +238,7 @@ exports.login = async (req, res) => {
           user: {
               id: user.id,
               firstName: user.firstName,
+              middleName: user.middleName,
               lastName: user.lastName,
               surname: user.surname,
               email: user.email,
