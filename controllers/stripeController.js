@@ -1,25 +1,44 @@
 const Account = require('../models/Account');
+const Beneficiary = require('../models/Beneficiary');
+const FunderBeneficiary = require('../models/FunderBeneficiary');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-const createPaymentIntent = async (req, res) => {
+exports.sendFunds = async (req, res) => {
     try {
-        const { amount, currency = 'zar' } = req.body;
+        const { funderId, beneficiaryId, accountNumber, amount } = req.body;
 
+        // Check if the beneficiary exists
+        const beneficiary = await Beneficiary.findOne({ where: { id: beneficiaryId } });
+        if (!beneficiary) {
+            return res.status(404).json({ error: 'Beneficiary not found' });
+        }
+
+        // Check if the beneficiary is linked to the funder
+        const association = await FunderBeneficiary.findOne({ where: { funderId, beneficiaryId } });
+        if (!association) {
+            return res.status(403).json({ error: 'Beneficiary not associated with funder' });
+        }
+
+        // Check if the account exists and belongs to the beneficiary
+        const account = await Account.findOne({ where: { accountNumber, userId: beneficiaryId } });
+        if (!account) {
+            return res.status(404).json({ error: 'Account not found for this beneficiary' });
+        }
+
+        // Create payment intent with account number in metadata
         const paymentIntent = await stripe.paymentIntents.create({
             amount: Math.round(amount * 100),
-            currency: currency.toLowerCase(),
+            currency: 'zar',
+            metadata: { account_number: accountNumber }
         });
 
-        res.json({
-            clientSecret: paymentIntent.client_secret,
-        });
-    } catch (error) {
-        console.error('Payment Intent Error:', error);
-        res.status(500).json({ error: 'Failed to create payment intent' });
+        res.json({ clientSecret: paymentIntent.client_secret });
+    } catch (err) {
+        res.status(500).json({ error: 'Server error', details: err.message });
     }
 };
 
-const handleWebhook = async (req, res) => {
+exports.handleWebhook = async (req, res) => {
     const sig = req.headers['stripe-signature'];
     let event;
 
@@ -30,27 +49,20 @@ const handleWebhook = async (req, res) => {
             process.env.STRIPE_WEBHOOK_SECRET
         );
 
-        // Handle the event
         switch (event.type) {
             case 'payment_intent.succeeded':
-                // Handle successful payment
                 const paymentIntent = event.data.object;
-
                 const accountNumber = paymentIntent.metadata.account_number;
-                const amount = paymentIntent.amount / 100; // Convert cents to ZAR
+                const amount = paymentIntent.amount / 100;
 
                 try {
-                    // Update the account balance in the database
                     const account = await Account.findOne({ where: { accountNumber } });
-
                     if (!account) {
                         console.error(`Account ${accountNumber} not found.`);
                         return res.status(404).end();
                     }
-
                     account.balance += amount;
                     await account.save();
-
                     console.log(`Payment succeeded for account: ${accountNumber}, Amount: ${amount}`);
                 } catch (err) {
                     console.error('Database error:', err.message);
@@ -65,9 +77,4 @@ const handleWebhook = async (req, res) => {
         console.error('Webhook Error:', err.message);
         res.status(400).json({ error: `Webhook Error: ${err.message}` });
     }
-};
-
-module.exports = {
-    createPaymentIntent,
-    handleWebhook
 };
