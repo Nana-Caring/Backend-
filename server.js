@@ -1,7 +1,9 @@
+require('dotenv').config(); // Loads environment variables from .env
+const cookieParser = require('cookie-parser'); // For parsing cookies
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-require('dotenv').config();
 
 const db = require('./models');
 const stripeRoutes = require('./routes/stripeRoutes');
@@ -13,6 +15,7 @@ const app = express();
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
+app.use(cookieParser());
 
 // Routes
 app.use('/api/stripe', stripeRoutes);

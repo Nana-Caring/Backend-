@@ -80,12 +80,33 @@ exports.registerDependent = async (req, res) => {
       return res.status(400).json({ message: 'Valid email address required' });
     }
 
+    // Validate email uniqueness
+    const emailExists = await User.findOne({ where: { email } });
+    if (emailExists){
+      return res.status(400).json({message:'Email already exists'});
+    }
+
+    // Validate ID number format
+    const IdnumberRegex = /^[0-9]{13}$/;
+    if (!IdnumberRegex.test(Idnumber)) {
+      return res.status(400).json({ message: 'Valid 13-digit numeric ID number required' });
+    }
+    
+    // Validate ID number uniqueness
+    const idNumberExists = await User.findOne({ where: { Idnumber } });
+    if (idNumberExists) {
+      return res.status(400).json({ message: 'ID number already exists' });
+    }
+
+
+
     // Verify caregiver status
     const caregiver = await User.findByPk(caregiverId);
     if (!caregiver || caregiver.role !== 'caregiver') {
       return res.status(403).json({ message: 'Only caregivers can register dependents' });
     }
-
+    
+    
     // Check if email or ID number already exists
     const existingUser = await User.findOne({
       where: {
@@ -226,15 +247,29 @@ exports.login = async (req, res) => {
       }
 
       // Generate JWT token
-      const token = jwt.sign(
-          { id: user.id, role: user.role },
-          process.env.JWT_SECRET,
-          { expiresIn: '1h' }
+      const accessToken = jwt.sign(
+        { id: user.id, role: user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: '15m' } // Short-lived
       );
+
+      const refreshToken = jwt.sign(
+        { id: user.id },
+        process.env.JWT_REFRESH_SECRET,
+        { expiresIn: '7d' } // Long-lived
+      );
+
+      // Set refresh token in httpOnly, secure cookie
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: true, // set to true in production (requires HTTPS)
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      });
 
       // Format response
       const response = {
-          token,
+          accessToken,
           user: {
               id: user.id,
               firstName: user.firstName,
@@ -259,5 +294,22 @@ exports.login = async (req, res) => {
   } catch (error) {
       console.error('Login error:', error);
       res.status(500).json({ error: 'Login failed' });
+  }
+};
+
+exports.refreshToken = (req, res) => {
+  const token = req.cookies.refreshToken;
+  if (!token) return res.status(401).json({ message: 'No refresh token' });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    const accessToken = jwt.sign(
+      { id: decoded.id, role: decoded.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+    res.json({ accessToken });
+  } catch (err) {
+    return res.status(403).json({ message: 'Invalid refresh token' });
   }
 };
