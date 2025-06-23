@@ -250,13 +250,13 @@ exports.login = async (req, res) => {
       const accessToken = jwt.sign(
         { id: user.id, role: user.role },
         process.env.JWT_SECRET,
-        { expiresIn: '15m' } // Short-lived
+       
       );
 
       const refreshToken = jwt.sign(
         { id: user.id },
         process.env.JWT_REFRESH_SECRET,
-        { expiresIn: '7d' } // Long-lived
+      
       );
 
       // Set refresh token in httpOnly, secure cookie
