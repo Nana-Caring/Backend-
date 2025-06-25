@@ -269,12 +269,12 @@ exports.login = async (req, res) => {
 
       // Format response
       const response = {
-          accessToken,
+          accessToken, // JWT token
+          jwt: accessToken, // Optional: alias for clarity
           user: {
               id: user.id,
               firstName: user.firstName,
               middleName: user.middleName,
-              lastName: user.lastName,
               surname: user.surname,
               email: user.email,
               role: user.role,
