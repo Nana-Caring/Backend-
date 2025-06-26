@@ -180,6 +180,13 @@ exports.registerDependent = async (req, res) => {
       })
     );
 
+    // Mirror savings balance to main account
+    const savingsAccount = subAccounts.find(acc => acc.accountType === 'Savings');
+    if (savingsAccount) {
+      mainAccount.balance = savingsAccount.balance;
+      await mainAccount.save();
+    }
+
     res.status(201).json({
       message: 'Dependent registered successfully',
       dependent: {
