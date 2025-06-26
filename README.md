@@ -57,7 +57,3 @@ This repository contains the complete backend and CMS codebases for the NANA Pro
   Both the backend and CMS can connect to the same database or communicate via API, depending on your architecture.
 
 ---
-
-## Contribution
-
-Prince Ngwako Mashumu
