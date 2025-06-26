@@ -191,9 +191,9 @@ exports.registerDependent = async (req, res) => {
       message: 'Dependent registered successfully',
       dependent: {
         ...dependent.get({ plain: true }),
-        password: undefined, // Exclude password from response
-      },
-      accounts: [mainAccount, ...subAccounts],
+        password: undefined,
+        accounts: [mainAccount, ...subAccounts].map(acc => acc.get ? acc.get({ plain: true }) : acc)
+      }
     });
   } catch (error) {
     console.error(error);

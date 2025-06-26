@@ -18,10 +18,12 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
 // Import models
 const User = require('./User');
 const Account = require('./Account');
+const FunderDependent = require('./FunderDependent')(sequelize, Sequelize.DataTypes);
 
 const models = {
     User,
-    Account
+    Account,
+    FunderDependent
 };
 
 // Set up associations

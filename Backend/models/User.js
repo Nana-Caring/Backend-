@@ -49,4 +49,19 @@ const User = sequelize.define('User', {
   timestamps: true
 });
 
+User.associate = function(models) {
+  User.belongsToMany(models.User, {
+    as: 'Dependents',
+    through: 'FunderDependent',
+    foreignKey: 'funderId',
+    otherKey: 'dependentId'
+  });
+  User.belongsToMany(models.User, {
+    as: 'Funders',
+    through: 'FunderDependent',
+    foreignKey: 'dependentId',
+    otherKey: 'funderId'
+  });
+};
+
 module.exports = User;
