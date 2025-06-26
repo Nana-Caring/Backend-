@@ -39,7 +39,7 @@ exports.register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create new user
-    user = await User.create({ 
+    const user = await User.create({ 
       firstName, 
       middleName, 
       surname, 
@@ -49,9 +49,27 @@ exports.register = async (req, res) => {
       Idnumber 
     });
 
+    // If the user is a funder, create an account for them
+    let account = null;
+    if (role === 'funder') {
+      const accountNumber = await generateUniqueAccountNumber();
+      account = await Account.create({
+        userId: user.id,
+        accountType: 'Main',
+        balance: 0,
+        parentAccountId: null,
+        accountNumber: accountNumber,
+      });
+    }
+
     // Remove sensitive data from response
     const userResponse = user.get({ plain: true });
     delete userResponse.password;
+
+    // Attach account info if funder
+    if (account) {
+      userResponse.account = account;
+    }
 
     res.status(201).json({ 
       message: "User registered successfully", 
@@ -285,8 +303,8 @@ exports.login = async (req, res) => {
           }
       };
 
-      // Add accounts if user is dependent
-      if (user.role === 'dependent' && user.accounts) {
+      // Add accounts for funder or dependent
+      if ((user.role === 'funder' || user.role === 'dependent') && user.accounts) {
           response.accounts = user.accounts;
       }
 
