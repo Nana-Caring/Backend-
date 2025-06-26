@@ -377,7 +377,7 @@ exports.refreshToken = (req, res) => {
 // Admin login
 exports.adminLogin = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, firstName, surname, middleName } = req.body;
 
     if (
       email === process.env.ADMIN_EMAIL &&
@@ -405,8 +405,9 @@ exports.adminLogin = async (req, res) => {
         jwt: accessToken,
         user: {
           id: 0,
-          firstName: 'Admin',
-          surname: '',
+          firstName: firstName || 'Admin',
+          middleName: middleName || '',
+          surname: surname || '',
           email: process.env.ADMIN_EMAIL,
           role: 'admin'
         }
