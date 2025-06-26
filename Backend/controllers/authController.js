@@ -373,3 +373,49 @@ exports.refreshToken = (req, res) => {
     return res.status(403).json({ message: 'Invalid refresh token' });
   }
 };
+
+// Admin login
+exports.adminLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (
+      email === process.env.ADMIN_EMAIL &&
+      password === process.env.ADMIN_PASSWORD
+    ) {
+      // Generate JWT token for admin
+      const accessToken = jwt.sign(
+        { id: 0, role: 'admin' },
+        process.env.JWT_SECRET
+      );
+      const refreshToken = jwt.sign(
+        { id: 0, role: 'admin' },
+        process.env.JWT_REFRESH_SECRET
+      );
+
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+      });
+
+      return res.json({
+        accessToken,
+        jwt: accessToken,
+        user: {
+          id: 0,
+          firstName: 'Admin',
+          surname: '',
+          email: process.env.ADMIN_EMAIL,
+          role: 'admin'
+        }
+      });
+    } else {
+      return res.status(401).json({ message: 'Invalid admin credentials' });
+    }
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({ error: 'Admin login failed' });
+  }
+};
