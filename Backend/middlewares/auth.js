@@ -13,8 +13,12 @@ const auth = async (req, res, next) => {
     // Verify token using secret from .env
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    // Allow admin token (not in DB)
+    if (decoded.role === 'admin') {
+      req.user = { id: 0, role: 'admin', email: process.env.ADMIN_EMAIL, firstName: 'Admin' };
+      return next();
+    }
 
-    
     // Check if user still exists
     const user = await User.findByPk(decoded.id);
     if (!user) {
