@@ -6,7 +6,7 @@
             "port": 5432,
             "driver": "PostgreSQL",
             "name": "PG Local",
-            "database": "TransactionTracker",
+            "database": "TransationTracker",
             "username": "postgres",
             "password": "Nana123",
             "connectionTimeout": 30

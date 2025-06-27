@@ -6,6 +6,8 @@ require('dotenv').config();
 const db = require('./models');
 const stripeRoutes = require('./routes/stripeRoutes');
 const authRoutes = require('./routes/authRoutes');
+const beneficiaryRoutes = require('./routes/beneficiaryRoutes');
+const addNewBeneficiaryRoutes = require('./routes/addNewBeneficiaryRoutes');
 
 const app = express();
 
@@ -17,6 +19,9 @@ app.use(express.json());
 // Routes
 app.use('/api/stripe', stripeRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/beneficiaries', beneficiaryRoutes);
+app.use('/api/add-beneficiary', addNewBeneficiaryRoutes);
+
 
 const PORT = process.env.PORT || 5432;
 app.listen(PORT, () => {

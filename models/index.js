@@ -19,15 +19,12 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
 const User = require('./User');
 const Account = require('./Account');
 const Beneficiary = require('./Beneficiary');
-const FunderBeneficiary = require('./FunderBeneficiary');
-
 
 
 const models = {
     User,
     Account,
-    Beneficiary,           
-    FunderBeneficiary 
+    Beneficiary 
 };
 
 // Set up associations
@@ -40,13 +37,6 @@ Account.belongsTo(User, {
     foreignKey: 'userId',
     as: 'user'
 });
-
-User.hasMany(FunderBeneficiary, { foreignKey: 'funderId' });
-FunderBeneficiary.belongsTo(User, { foreignKey: 'funderId' });
-
-Beneficiary.hasMany(FunderBeneficiary, { foreignKey: 'beneficiaryId' });
-FunderBeneficiary.belongsTo(Beneficiary, { foreignKey: 'beneficiaryId' });
-
 
 // Test connection
 sequelize.authenticate()
