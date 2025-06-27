@@ -1,6 +1,0 @@
-JWT_SECRET="h,F<m$f@4=g^ZcD3>-8;a"
-DB_USER=postgres
-DB_PASSWORD=Nana123
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME="TransactionTracker"

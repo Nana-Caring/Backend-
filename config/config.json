@@ -1,8 +1,8 @@
 {
   "development": {
     "username": "postgres",
-    "password": "Prince@082",
-    "database": "Nana Caring",
+    "password": "Nana123",
+    "database": "TransactionTracker",
     "host": "localhost",
     "port": 5432,
     "dialect": "postgres"
