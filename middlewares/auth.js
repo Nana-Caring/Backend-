@@ -3,25 +3,29 @@ const User = require('../models/User');
 
 const auth = async (req, res, next) => {
   try {
-    // Get token from header
     const token = req.header('Authorization')?.replace('Bearer ', '');
+    console.log('Received token:', token);
 
     if (!token) {
       return res.status(401).json({ message: 'No token, authorization denied' });
     }
 
-    // Verify token
+    // Verify token using secret from .env
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Check if user still exists in database
+    // Allow admin token (not in DB)
+    if (decoded.role === 'admin') {
+      req.user = { id: 0, role: 'admin', email: process.env.ADMIN_EMAIL, firstName: 'Admin' };
+      return next();
+    }
+
+    // Check if user still exists
     const user = await User.findByPk(decoded.id);
     if (!user) {
       return res.status(401).json({ message: 'User not found' });
     }
 
-    // Set user info in request
     req.user = user;
-
     next();
   } catch (error) {
     console.error('Auth middleware error:', error.message);
@@ -29,7 +33,6 @@ const auth = async (req, res, next) => {
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ message: 'Token has expired' });
     }
-
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ message: 'Invalid token' });
     }

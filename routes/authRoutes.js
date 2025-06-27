@@ -1,6 +1,6 @@
 const express = require("express");
 const { check } = require("express-validator");
-const { register, login, getUser, registerDependent } = require("../controllers/authController");
+const { register, login, getUser, registerDependent, adminLogin } = require("../controllers/authController");
 const authMiddleware = require("../middlewares/auth");
 
 const router = express.Router();
@@ -14,6 +14,9 @@ router.post(
   ],
   login
 );
+
+// ADMIN LOGIN
+router.post("/admin-login", adminLogin);
 
 // REGISTER (Funder or Caregiver)
 router.post(

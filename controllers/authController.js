@@ -39,7 +39,7 @@ exports.register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create new user
-    user = await User.create({ 
+    const user = await User.create({ 
       firstName, 
       middleName, 
       surname, 
@@ -49,9 +49,27 @@ exports.register = async (req, res) => {
       Idnumber 
     });
 
+    // If the user is a funder, create an account for them
+    let account = null;
+    if (role === 'funder') {
+      const accountNumber = await generateUniqueAccountNumber();
+      account = await Account.create({
+        userId: user.id,
+        accountType: 'Main',
+        balance: 0,
+        parentAccountId: null,
+        accountNumber: accountNumber,
+      });
+    }
+
     // Remove sensitive data from response
     const userResponse = user.get({ plain: true });
     delete userResponse.password;
+
+    // Attach account info if funder
+    if (account) {
+      userResponse.account = account;
+    }
 
     res.status(201).json({ 
       message: "User registered successfully", 
@@ -80,12 +98,33 @@ exports.registerDependent = async (req, res) => {
       return res.status(400).json({ message: 'Valid email address required' });
     }
 
+    // Validate email uniqueness
+    const emailExists = await User.findOne({ where: { email } });
+    if (emailExists){
+      return res.status(400).json({message:'Email already exists'});
+    }
+
+    // Validate ID number format
+    const IdnumberRegex = /^[0-9]{13}$/;
+    if (!IdnumberRegex.test(Idnumber)) {
+      return res.status(400).json({ message: 'Valid 13-digit numeric ID number required' });
+    }
+    
+    // Validate ID number uniqueness
+    const idNumberExists = await User.findOne({ where: { Idnumber } });
+    if (idNumberExists) {
+      return res.status(400).json({ message: 'ID number already exists' });
+    }
+
+
+
     // Verify caregiver status
     const caregiver = await User.findByPk(caregiverId);
     if (!caregiver || caregiver.role !== 'caregiver') {
       return res.status(403).json({ message: 'Only caregivers can register dependents' });
     }
-
+    
+    
     // Check if email or ID number already exists
     const existingUser = await User.findOne({
       where: {
@@ -141,13 +180,20 @@ exports.registerDependent = async (req, res) => {
       })
     );
 
+    // Mirror savings balance to main account
+    const savingsAccount = subAccounts.find(acc => acc.accountType === 'Savings');
+    if (savingsAccount) {
+      mainAccount.balance = savingsAccount.balance;
+      await mainAccount.save();
+    }
+
     res.status(201).json({
       message: 'Dependent registered successfully',
       dependent: {
         ...dependent.get({ plain: true }),
-        password: undefined, // Exclude password from response
-      },
-      accounts: [mainAccount, ...subAccounts],
+        password: undefined,
+        accounts: [mainAccount, ...subAccounts].map(acc => acc.get ? acc.get({ plain: true }) : acc)
+      }
     });
   } catch (error) {
     console.error(error);
@@ -203,61 +249,174 @@ exports.getDependents = async (req, res) => {
 // Login user
 exports.login = async (req, res) => {
   try {
-      const { email, password } = req.body;
+    const { email, password } = req.body;
 
-      // Find user by email with associated accounts using the alias
-      const user = await User.findOne({ 
-          where: { email },
-          include: [{
-              model: Account,
-              as: 'accounts', // Use the alias defined in associations
-              attributes: ['id', 'accountNumber', 'accountType', 'balance', 'status', 'currency']
-          }]
-      });
-
-      if (!user) {
-          return res.status(401).json({ error: 'Invalid credentials' });
-      }
-
-      // Check password
-      const isValidPassword = await bcrypt.compare(password, user.password);
-      if (!isValidPassword) {
-          return res.status(401).json({ error: 'Invalid credentials' });
-      }
-
-      // Generate JWT token
-      const token = jwt.sign(
-          { id: user.id, role: user.role },
-          process.env.JWT_SECRET,
-          { expiresIn: '1h' }
+    // Check for admin login
+    if (
+      email === process.env.ADMIN_EMAIL &&
+      password === process.env.ADMIN_PASSWORD
+    ) {
+      // Generate JWT token for admin
+      const accessToken = jwt.sign(
+        { id: 0, role: 'admin' },
+        process.env.JWT_SECRET
+      );
+      const refreshToken = jwt.sign(
+        { id: 0, role: 'admin' },
+        process.env.JWT_REFRESH_SECRET
       );
 
-      // Format response
-      const response = {
-          token,
-          user: {
-              id: user.id,
-              firstName: user.firstName,
-              middleName: user.middleName,
-              lastName: user.lastName,
-              surname: user.surname,
-              email: user.email,
-              role: user.role,
-              Idnumber: user.Idnumber,
-              relation: user.relation,
-              createdAt: user.createdAt,
-              updatedAt: user.updatedAt
-          }
-      };
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+      });
 
-      // Add accounts if user is dependent
-      if (user.role === 'dependent' && user.accounts) {
-          response.accounts = user.accounts;
-      }
+      return res.json({
+        accessToken,
+        jwt: accessToken,
+        user: {
+          id: 0,
+          firstName: 'Admin',
+          surname: '',
+          email: process.env.ADMIN_EMAIL,
+          role: 'admin'
+        }
+      });
+    }
 
-      res.json(response);
+    // Find user by email with associated accounts using the alias
+    const user = await User.findOne({ 
+        where: { email },
+        include: [{
+            model: Account,
+            as: 'accounts', // Use the alias defined in associations
+            attributes: ['id', 'accountNumber', 'accountType', 'balance', 'status', 'currency']
+        }]
+    });
+
+    if (!user) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Check password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Generate JWT token
+    const accessToken = jwt.sign(
+      { id: user.id, role: user.role },
+      process.env.JWT_SECRET,
+     
+    );
+
+    const refreshToken = jwt.sign(
+      { id: user.id },
+      process.env.JWT_REFRESH_SECRET,
+    
+    );
+
+    // Set refresh token in httpOnly, secure cookie
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: true, // set to true in production (requires HTTPS)
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    // Format response
+    const response = {
+        accessToken, // JWT token
+        jwt: accessToken, // Optional: alias for clarity
+        user: {
+            id: user.id,
+            firstName: user.firstName,
+            middleName: user.middleName,
+            surname: user.surname,
+            email: user.email,
+            role: user.role,
+            Idnumber: user.Idnumber,
+            relation: user.relation,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
+        }
+    };
+
+    // Add accounts for funder or dependent
+    if ((user.role === 'funder' || user.role === 'dependent') && user.accounts) {
+        response.accounts = user.accounts;
+    }
+
+    res.json(response);
+} catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+}
+};
+
+exports.refreshToken = (req, res) => {
+  const token = req.cookies.refreshToken;
+  if (!token) return res.status(401).json({ message: 'No refresh token' });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    const accessToken = jwt.sign(
+      { id: decoded.id, role: decoded.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+    res.json({ accessToken });
+  } catch (err) {
+    return res.status(403).json({ message: 'Invalid refresh token' });
+  }
+};
+
+// Admin login
+exports.adminLogin = async (req, res) => {
+  try {
+    const { email, password, firstName, surname, middleName } = req.body;
+
+    if (
+      email === process.env.ADMIN_EMAIL &&
+      password === process.env.ADMIN_PASSWORD
+    ) {
+      // Generate JWT token for admin
+      const accessToken = jwt.sign(
+        { id: 0, role: 'admin' },
+        process.env.JWT_SECRET
+      );
+      const refreshToken = jwt.sign(
+        { id: 0, role: 'admin' },
+        process.env.JWT_REFRESH_SECRET
+      );
+
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+      });
+
+      return res.json({
+        accessToken,
+        jwt: accessToken,
+        user: {
+          id: 0,
+          firstName: firstName || 'Admin',
+          middleName: middleName || '',
+          surname: surname || '',
+          email: process.env.ADMIN_EMAIL,
+          role: 'admin'
+        }
+      });
+    } else {
+      return res.status(401).json({ message: 'Invalid admin credentials' });
+    }
   } catch (error) {
-      console.error('Login error:', error);
-      res.status(500).json({ error: 'Login failed' });
+    console.error('Admin login error:', error);
+    res.status(500).json({ error: 'Admin login failed' });
   }
 };
