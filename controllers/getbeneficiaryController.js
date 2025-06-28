@@ -1,25 +1,25 @@
-const Beneficiary = require('../models/Beneficiary');
-const User = require('../models/User');
+const db = require('../models');
 
 exports.getMyBeneficiaries = async (req, res) => {
   try {
-    // check if the user is logged in and has the role of 'funder'
-    if (req.user.role !== 'funder') {
-      return res.status(403).json({ error: 'Access denied. Only funders can view their beneficiaries.' });
-    }
+    const funderId = req.user.id;
 
-    // Get beneficiaries linked to the logged-in funder
-    const beneficiaries = await Beneficiary.findAll({
-      where: { funderId: req.user.id },
-      include: [{
-       model: User,
-        as: 'user',
-        attributes: ['idNumber', 'name', 'accountNumber']
-      }]
+    const linkedDependents = await db.FunderDependent.findAll({
+      where: { funderId },
+      include: [
+        {
+          model: db.User,
+          as: 'dependent',
+          attributes: ['id', 'firstName', 'lastName', 'email']
+        }
+      ]
     });
+    
+    const beneficiaries = linkedDependents.map(entry => entry.dependent);
 
-    res.json(beneficiaries);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(200).json({ beneficiaries });
+  } catch (error) {
+    console.error('Error fetching linked beneficiaries:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

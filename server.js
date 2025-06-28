@@ -10,7 +10,6 @@ const stripeRoutes = require('./routes/stripeRoutes');
 const authRoutes = require('./routes/authRoutes');
 const adminRoutes = require('./routes/admin');
 const funderRoutes = require('./routes/funderRoutes');
-
 const app = express();
 
 // WARNING: Only use in development, not in production!
