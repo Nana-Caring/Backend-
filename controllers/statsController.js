@@ -5,26 +5,52 @@ const statsController = {
     // Get overall platform statistics
     getOverallStats: async (req, res) => {
         try {
+            // Verify db and models are available
+            if (!db || !db.User) {
+                throw new Error('Database models not properly initialized');
+            }
+
             const stats = {
-                totalUsers: await db.User.count(),
-                totalFunders: await db.User.count({ where: { role: 'funder' } }),
-                totalCaregivers: await db.User.count({ where: { role: 'caregiver' } }),
-                totalDependents: await db.User.count({ where: { role: 'dependent' } }),
-                // Add more stats as needed
-                totalTransactions: await db.Transaction.count(),
-                totalAmount: await db.Transaction.sum('amount')
+                totalUsers: await db.User.count() || 0,
+                totalFunders: await db.User.count({ where: { role: 'funder' } }) || 0,
+                totalCaregivers: await db.User.count({ where: { role: 'caregiver' } }) || 0,
+                totalDependents: await db.User.count({ where: { role: 'dependent' } }) || 0,
+                totalAccounts: await db.Account.count() || 0
             };
 
-            res.json(stats);
+            // Add transaction stats if the model exists
+            if (db.Transaction) {
+                stats.totalTransactions = await db.Transaction.count() || 0;
+                stats.totalAmount = await db.Transaction.sum('amount') || 0;
+            }
+
+            res.json({ 
+                success: true, 
+                data: stats 
+            });
         } catch (error) {
-            console.error('Error fetching stats:', error);
-            res.status(500).json({ error: 'Failed to fetch statistics' });
+            console.error('Error in getOverallStats:', error);
+            res.status(500).json({ 
+                success: false, 
+                error: 'Failed to fetch overall statistics',
+                details: error.message 
+            });
         }
     },
 
     // Get monthly statistics
     getMonthlyStats: async (req, res) => {
         try {
+            // Debug: Log available models
+            console.log('Available models:', Object.keys(db));
+            console.log('User model exists:', !!db.User);
+            console.log('Transaction model exists:', !!db.Transaction);
+
+            // Verify db and models are available
+            if (!db || !db.User) {
+                throw new Error('Required database models not found');
+            }
+
             const currentDate = new Date();
             const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
 
@@ -35,27 +61,70 @@ const statsController = {
                             [Op.gte]: firstDayOfMonth
                         }
                     }
-                }),
-                monthlyTransactions: await db.Transaction.count({
+                }) || 0,
+                
+                // Add role-specific counts
+                newFunders: await db.User.count({
                     where: {
+                        role: 'funder',
                         createdAt: {
                             [Op.gte]: firstDayOfMonth
                         }
                     }
-                }),
-                monthlyAmount: await db.Transaction.sum('amount', {
+                }) || 0,
+
+                newCaregivers: await db.User.count({
                     where: {
+                        role: 'caregiver',
                         createdAt: {
                             [Op.gte]: firstDayOfMonth
                         }
                     }
-                })
+                }) || 0,
+
+                newDependents: await db.User.count({
+                    where: {
+                        role: 'dependent',
+                        createdAt: {
+                            [Op.gte]: firstDayOfMonth
+                        }
+                    }
+                }) || 0
             };
 
-            res.json(monthlyStats);
+            // Add transaction stats only if Transaction model exists
+            if (db.Transaction) {
+                monthlyStats.monthlyTransactions = await db.Transaction.count({
+                    where: {
+                        createdAt: {
+                            [Op.gte]: firstDayOfMonth
+                        }
+                    }
+                }) || 0;
+
+                monthlyStats.monthlyAmount = await db.Transaction.sum('amount', {
+                    where: {
+                        createdAt: {
+                            [Op.gte]: firstDayOfMonth
+                        }
+                    }
+                }) || 0;
+            } else {
+                monthlyStats.monthlyTransactions = 'Transaction model not available';
+                monthlyStats.monthlyAmount = 'Transaction model not available';
+            }
+
+            res.json({
+                success: true,
+                data: monthlyStats
+            });
         } catch (error) {
-            console.error('Error fetching monthly stats:', error);
-            res.status(500).json({ error: 'Failed to fetch monthly statistics' });
+            console.error('Error in getMonthlyStats:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to fetch monthly statistics',
+                details: error.message
+            });
         }
     }
 };

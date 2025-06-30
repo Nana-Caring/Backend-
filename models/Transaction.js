@@ -1,17 +1,42 @@
-const { DataTypes } = require("sequelize");
-const sequelize = require("../config/database");
-const Account = require("./Account");
+module.exports = (sequelize, DataTypes) => {
+    const Transaction = sequelize.define('Transaction', {
+        id: {
+            type: DataTypes.UUID,
+            defaultValue: DataTypes.UUIDV4,
+            primaryKey: true
+        },
+        accountId: {
+            type: DataTypes.UUID,
+            allowNull: false,
+            references: {
+                model: 'Accounts',
+                key: 'id'
+            }
+        },
+        amount: {
+            type: DataTypes.FLOAT,
+            allowNull: false
+        },
+        type: {
+            type: DataTypes.ENUM('Debit', 'Credit'),
+            allowNull: false
+        },
+        timestamp: {
+            type: DataTypes.DATE,
+            defaultValue: DataTypes.NOW
+        }
+    }, {
+        tableName: 'Transactions',
+        timestamps: true
+    });
 
-const Transaction = sequelize.define("Transaction", {
-  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-  accountId: { type: DataTypes.UUID, allowNull: false, references: { model: "Accounts", key: "id" } },
-  amount: { type: DataTypes.FLOAT, allowNull: false },
-  type: { type: DataTypes.ENUM("Debit", "Credit"), allowNull: false },
-  timestamp: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
-}, { timestamps: true });
+    Transaction.associate = (models) => {
+        Transaction.belongsTo(models.Account, {
+            foreignKey: 'accountId',
+            as: 'account',
+            onDelete: 'CASCADE'
+        });
+    };
 
-// Define associations
-Transaction.belongsTo(Account, { foreignKey: "accountId", onDelete: "CASCADE" });
-Account.hasMany(Transaction, { foreignKey: "accountId" });
-
-module.exports = Transaction;
+    return Transaction;
+};
