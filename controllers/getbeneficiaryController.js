@@ -10,7 +10,7 @@ exports.getMyBeneficiaries = async (req, res) => {
         {
           model: db.User,
           as: 'dependent',
-          attributes: ['id', 'firstName', 'lastName', 'email']
+          attributes: ['id', 'firstName', 'middleName', 'email']
         }
       ]
     });
