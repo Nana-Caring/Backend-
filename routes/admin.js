@@ -3,6 +3,12 @@ const router = express.Router();
 const { User, Account, Transaction } = require('../models');
 const authenticate = require('../middlewares/auth');
 const isAdmin = require('../middlewares/isAdmin');
+const { 
+  blockUser, 
+  unblockUser, 
+  suspendUser, 
+  getBlockedUsers 
+} = require('../controllers/userController');
 
 // Get all users
 router.get('/users', authenticate, isAdmin, async (req, res) => {
@@ -47,5 +53,11 @@ router.get('/stats', authenticate, isAdmin, async (req, res) => {
   const transactionCount = await Transaction.count();
   res.json({ users: userCount, accounts: accountCount, transactions: transactionCount });
 });
+
+// User blocking routes
+router.put('/users/:userId/block', authenticate, isAdmin, blockUser);
+router.put('/users/:userId/unblock', authenticate, isAdmin, unblockUser);
+router.put('/users/:userId/suspend', authenticate, isAdmin, suspendUser);
+router.get('/blocked-users', authenticate, isAdmin, getBlockedUsers);
 
 module.exports = router;

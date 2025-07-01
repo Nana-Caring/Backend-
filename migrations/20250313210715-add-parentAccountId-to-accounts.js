@@ -8,7 +8,7 @@ module.exports = {
       const tableInfo = await queryInterface.describeTable('Accounts');
       if (!tableInfo.parentAccountId) {
         await queryInterface.addColumn('Accounts', 'parentAccountId', {
-          type: Sequelize.UUID,
+          type: Sequelize.INTEGER, // Changed to INTEGER to match Accounts.id
           allowNull: true,
           references: {
             model: 'Accounts',

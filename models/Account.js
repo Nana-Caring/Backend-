@@ -1,17 +1,17 @@
 const { Model, DataTypes } = require('sequelize');
-const { v4: uuidv4 } = require('uuid');
 const sequelize = require('../config/database');
 
 class Account extends Model {}
 
 Account.init({
   id: {
-    type: DataTypes.UUID,
-    defaultValue: uuidv4,
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
     primaryKey: true,
+    allowNull: false
   },
   userId: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false,
   },
   accountType: {
@@ -47,7 +47,7 @@ Account.init({
     allowNull: true,
   },
   parentAccountId: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: true,
   }
 }, {
@@ -56,5 +56,31 @@ Account.init({
   tableName: 'Accounts',
   timestamps: true
 });
+
+// Define associations
+Account.associate = function(models) {
+  // Account belongs to a User
+  Account.belongsTo(models.User, {
+    foreignKey: 'userId',
+    as: 'user'
+  });
+  
+  // Account has many Transactions
+  Account.hasMany(models.Transaction, {
+    foreignKey: 'accountId',
+    as: 'transactions'
+  });
+  
+  // Self-referencing for parent accounts
+  Account.belongsTo(models.Account, {
+    foreignKey: 'parentAccountId',
+    as: 'parentAccount'
+  });
+  
+  Account.hasMany(models.Account, {
+    foreignKey: 'parentAccountId',
+    as: 'subAccounts'
+  });
+};
 
 module.exports = Account;

@@ -10,6 +10,9 @@ const stripeRoutes = require('./routes/stripeRoutes');
 const authRoutes = require('./routes/authRoutes');
 const adminRoutes = require('./routes/admin');
 const funderRoutes = require('./routes/funderRoutes');
+const statsRoutes = require('./routes/statsRoutes');
+const accountRoutes = require('./routes/accountRoutes');
+
 const app = express();
 
 // WARNING: Only use in development, not in production!
@@ -33,7 +36,8 @@ app.use('/api/stripe', stripeRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/admin', adminRoutes);
 app.use('/api/funder', funderRoutes);
-
+app.use('/api/stats', statsRoutes);
+app.use('/api/accounts', accountRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

@@ -6,12 +6,12 @@ module.exports = {
     try {
       await queryInterface.createTable('Transactions', {
         id: {
-          type: Sequelize.UUID,
-          defaultValue: Sequelize.UUIDV4,
+          type: Sequelize.INTEGER,
+          autoIncrement: true,
           primaryKey: true,
         },
         accountId: {
-          type: Sequelize.UUID,
+          type: Sequelize.INTEGER,
           allowNull: false,
           references: {
             model: 'Accounts',

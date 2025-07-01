@@ -38,15 +38,27 @@ exports.register = async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user
+    // Create new user with explicit null values for optional fields
     const user = await User.create({ 
       firstName, 
-      middleName, 
+      middleName: middleName || null, 
       surname, 
       email, 
       password: hashedPassword, 
       role,
-      Idnumber 
+      Idnumber,
+      // Explicitly set personal details to null until user edits them
+      phoneNumber: null,
+      postalAddressLine1: null,
+      postalAddressLine2: null,
+      postalCity: null,
+      postalProvince: null,
+      postalCode: null,
+      homeAddressLine1: null,
+      homeAddressLine2: null,
+      homeCity: null,
+      homeProvince: null,
+      homeCode: null
     });
 
     // If the user is a funder, create an account for them
@@ -139,16 +151,28 @@ exports.registerDependent = async (req, res) => {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Create dependent
+    // Create dependent with explicit null values for optional fields
     const dependent = await User.create({
       firstName,
-      middleName,  // Optional field
+      middleName: middleName || null,  // Optional field
       surname,
       email,
       password: hashedPassword,
       Idnumber,
       relation,
       role: 'dependent',
+      // Explicitly set personal details to null until user edits them
+      phoneNumber: null,
+      postalAddressLine1: null,
+      postalAddressLine2: null,
+      postalCity: null,
+      postalProvince: null,
+      postalCode: null,
+      homeAddressLine1: null,
+      homeAddressLine2: null,
+      homeCity: null,
+      homeProvince: null,
+      homeCode: null
     });
 
     // Generate unique account number for main account
@@ -298,6 +322,39 @@ exports.login = async (req, res) => {
 
     if (!user) {
         return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Check if user is blocked or suspended
+    if (user.isBlocked || user.status === 'blocked') {
+        return res.status(403).json({ 
+            error: 'Account blocked',
+            message: 'Your account has been blocked. Please contact support.',
+            code: 'ACCOUNT_BLOCKED',
+            details: {
+                blockedAt: user.blockedAt,
+                reason: user.blockReason || 'No reason provided'
+            }
+        });
+    }
+
+    if (user.status === 'suspended') {
+        return res.status(403).json({ 
+            error: 'Account suspended',
+            message: 'Your account has been suspended. Please contact support.',
+            code: 'ACCOUNT_SUSPENDED',
+            details: {
+                blockedAt: user.blockedAt,
+                reason: user.blockReason || 'No reason provided'
+            }
+        });
+    }
+
+    if (user.status === 'pending') {
+        return res.status(403).json({ 
+            error: 'Account pending',
+            message: 'Your account is pending activation. Please contact support.',
+            code: 'ACCOUNT_PENDING'
+        });
     }
 
     // Check password
