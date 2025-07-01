@@ -57,4 +57,30 @@ Account.init({
   timestamps: true
 });
 
+// Define associations
+Account.associate = function(models) {
+  // Account belongs to a User
+  Account.belongsTo(models.User, {
+    foreignKey: 'userId',
+    as: 'user'
+  });
+  
+  // Account has many Transactions
+  Account.hasMany(models.Transaction, {
+    foreignKey: 'accountId',
+    as: 'transactions'
+  });
+  
+  // Self-referencing for parent accounts
+  Account.belongsTo(models.Account, {
+    foreignKey: 'parentAccountId',
+    as: 'parentAccount'
+  });
+  
+  Account.hasMany(models.Account, {
+    foreignKey: 'parentAccountId',
+    as: 'subAccounts'
+  });
+};
+
 module.exports = Account;
