@@ -54,8 +54,8 @@ const createPaymentIntent = async (req, res) => {
       amount: Math.round(amount * 100), // cents
       currency: 'zar',
       metadata: {
-        account_number: account.accountNumber,
-        account_type: account.accountType
+        accountNumber: account.accountNumber,
+        accountType: account.accountType
       }
     });
 
@@ -82,13 +82,11 @@ const handleWebhook = async (req, res) => {
         );
 
         // Handle the event
-        switch (event.type) {
-            case 'payment_intent.succeeded':
+        if(event.type === 'payment_intent.succeeded') {
                 // Handle successful payment
                 const paymentIntent = event.data.object;
-
-                const accountNumber = paymentIntent.metadata.account_number;
-                const accountType = paymentIntent.metadata.account_type;
+                const accountNumber = paymentIntent.metadata.accountNumber;
+                const accountType = paymentIntent.metadata.accountType;
                 const amount = paymentIntent.amount / 100; // Convert cents to ZAR
 
                 try {
@@ -97,20 +95,18 @@ const handleWebhook = async (req, res) => {
 
                     if (!account) {
                         console.error(`Account ${accountNumber} (${accountType}) not found.`);
-                        return res.status(404).end();
-                    }
-
+                   } else {
                     // update the account balance
                     account.balance += amount;
                     await account.save();
 
                     console.log(`Payment succeeded for account: ${accountNumber} (${accountType}), Amount: ${amount}`);
-                } catch (err) {
-                    console.error('Database error:', err.message);
                 }
-                break;
-            default:
-                console.log(`Unhandled event type ${event.type}`);
+            } catch (err) {
+                console.error('Database error:', err.message);
+            }
+        } else {
+            console.log(`Unhandled event type ${event.type}`);
         }
 
         res.json({ received: true });
