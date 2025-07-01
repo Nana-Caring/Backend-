@@ -1,17 +1,17 @@
 const { Model, DataTypes } = require('sequelize');
-const { v4: uuidv4 } = require('uuid');
 const sequelize = require('../config/database');
 
 class Account extends Model {}
 
 Account.init({
   id: {
-    type: DataTypes.UUID,
-    defaultValue: uuidv4,
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
     primaryKey: true,
+    allowNull: false
   },
   userId: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false,
   },
   accountType: {
@@ -47,7 +47,7 @@ Account.init({
     allowNull: true,
   },
   parentAccountId: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: true,
   }
 }, {

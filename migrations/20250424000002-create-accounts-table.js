@@ -4,63 +4,8 @@
 module.exports = {
   async up(queryInterface, Sequelize) {
     try {
-      await queryInterface.createTable('Accounts', {
-        id: {
-          type: Sequelize.UUID,
-          defaultValue: Sequelize.UUIDV4,
-          primaryKey: true,
-        },
-        userId: {
-          type: Sequelize.UUID,
-          allowNull: false,
-        },
-        accountType: {
-          type: Sequelize.STRING,
-          allowNull: false,
-        },
-        accountNumber: {
-          type: Sequelize.STRING(10),
-          allowNull: false,
-          unique: true,
-        },
-        balance: {
-          type: Sequelize.FLOAT,
-          defaultValue: 0,
-        },
-        currency: {
-          type: Sequelize.STRING(3),
-          defaultValue: 'ZAR',
-          allowNull: false,
-        },
-        status: {
-          type: Sequelize.ENUM('active', 'inactive', 'frozen'),
-          defaultValue: 'active',
-          allowNull: false,
-        },
-        creationDate: {
-          type: Sequelize.DATEONLY,
-          defaultValue: Sequelize.NOW,
-          allowNull: false,
-        },
-        lastTransactionDate: {
-          type: Sequelize.DATE,
-          allowNull: true,
-        },
-        parentAccountId: {
-          type: Sequelize.UUID,
-          allowNull: true,
-        },
-        createdAt: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-        },
-        updatedAt: {
-          type: Sequelize.DATE,
-          allowNull: false,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-        }
-      });
+      // This migration is disabled - Accounts table is created by 20250313201217-add-accountType-to-Accounts.js with INTEGER IDs
+      console.log('Skipping UUID-based accounts table creation - using INTEGER-based version instead');
     } catch (error) {
       console.error('Migration error:', error);
       throw error;

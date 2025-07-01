@@ -7,7 +7,11 @@ const {
   login,
   getUser,
   registerDependent,
-  getDependents
+  getDependents,
+  updateProfile,
+  getUserProfile,
+  getProfileCompletionStatus,
+  validateProfileUpdate
 } = require('../controllers/userController');
 
 // Define routes based on available controller functions
@@ -29,6 +33,19 @@ if (typeof registerDependent === 'function') {
 
 if (typeof getDependents === 'function') {
   router.get('/dependents', auth, getDependents);
+}
+
+// Profile management routes
+if (typeof getUserProfile === 'function') {
+  router.get('/profile', auth, getUserProfile);
+}
+
+if (typeof getProfileCompletionStatus === 'function') {
+  router.get('/profile/completion', auth, getProfileCompletionStatus);
+}
+
+if (typeof updateProfile === 'function') {
+  router.put('/profile', auth, validateProfileUpdate, updateProfile);
 }
 
 module.exports = router;
