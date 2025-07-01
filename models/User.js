@@ -45,6 +45,33 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true
   },
+  // User blocking/status fields
+  isBlocked: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  },
+  blockedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  blockedBy: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
+  },
+  blockReason: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  status: {
+    type: DataTypes.ENUM('active', 'blocked', 'suspended', 'pending'),
+    allowNull: false,
+    defaultValue: 'active'
+  },
   // Personal details - these remain null until user explicitly edits them
   phoneNumber: {
     type: DataTypes.STRING(15),
@@ -117,6 +144,18 @@ User.associate = function(models) {
     through: 'FunderDependent',
     foreignKey: 'dependentId',
     otherKey: 'funderId'
+  });
+  
+  // User blocking associations
+  User.belongsTo(models.User, {
+    as: 'BlockedByUser',
+    foreignKey: 'blockedBy',
+    constraints: false
+  });
+  User.hasMany(models.User, {
+    as: 'BlockedUsers',
+    foreignKey: 'blockedBy',
+    constraints: false
   });
 };
 

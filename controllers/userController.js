@@ -1,6 +1,7 @@
 // controllers/userController.js
 const { User } = require('../models');
 const { body, validationResult } = require('express-validator');
+const { Op } = require('sequelize');
 
 exports.getUser = async (req, res) => {
     try {
@@ -205,6 +206,220 @@ exports.getProfileCompletionStatus = async (req, res) => {
 
     } catch (error) {
         console.error('Get profile completion status error:', error);
+        res.status(500).json({ 
+            message: "Server error", 
+            error: error.message 
+        });
+    }
+};
+
+// Block a user (Admin only)
+exports.blockUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { reason } = req.body;
+        const adminId = req.user.id;
+
+        // Check if admin is trying to block themselves
+        if (parseInt(userId) === adminId) {
+            return res.status(400).json({ 
+                message: "You cannot block yourself" 
+            });
+        }
+
+        // Find the user to block
+        const userToBlock = await User.findByPk(userId);
+        if (!userToBlock) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Check if user is already blocked
+        if (userToBlock.isBlocked || userToBlock.status === 'blocked') {
+            return res.status(400).json({ 
+                message: "User is already blocked" 
+            });
+        }
+
+        // Block the user
+        await userToBlock.update({
+            isBlocked: true,
+            status: 'blocked',
+            blockedAt: new Date(),
+            blockedBy: adminId,
+            blockReason: reason || 'No reason provided'
+        });
+
+        res.status(200).json({
+            message: "User blocked successfully",
+            user: {
+                id: userToBlock.id,
+                email: userToBlock.email,
+                firstName: userToBlock.firstName,
+                surname: userToBlock.surname,
+                isBlocked: true,
+                status: 'blocked',
+                blockedAt: userToBlock.blockedAt,
+                blockReason: userToBlock.blockReason
+            }
+        });
+
+    } catch (error) {
+        console.error('Block user error:', error);
+        res.status(500).json({ 
+            message: "Server error", 
+            error: error.message 
+        });
+    }
+};
+
+// Unblock a user (Admin only)
+exports.unblockUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        // Find the user to unblock
+        const userToUnblock = await User.findByPk(userId);
+        if (!userToUnblock) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Check if user is not blocked
+        if (!userToUnblock.isBlocked && userToUnblock.status !== 'blocked') {
+            return res.status(400).json({ 
+                message: "User is not blocked" 
+            });
+        }
+
+        // Unblock the user
+        await userToUnblock.update({
+            isBlocked: false,
+            status: 'active',
+            blockedAt: null,
+            blockedBy: null,
+            blockReason: null
+        });
+
+        res.status(200).json({
+            message: "User unblocked successfully",
+            user: {
+                id: userToUnblock.id,
+                email: userToUnblock.email,
+                firstName: userToUnblock.firstName,
+                surname: userToUnblock.surname,
+                isBlocked: false,
+                status: 'active'
+            }
+        });
+
+    } catch (error) {
+        console.error('Unblock user error:', error);
+        res.status(500).json({ 
+            message: "Server error", 
+            error: error.message 
+        });
+    }
+};
+
+// Suspend a user (Admin only)
+exports.suspendUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { reason } = req.body;
+        const adminId = req.user.id;
+
+        // Check if admin is trying to suspend themselves
+        if (parseInt(userId) === adminId) {
+            return res.status(400).json({ 
+                message: "You cannot suspend yourself" 
+            });
+        }
+
+        // Find the user to suspend
+        const userToSuspend = await User.findByPk(userId);
+        if (!userToSuspend) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Suspend the user
+        await userToSuspend.update({
+            status: 'suspended',
+            blockedAt: new Date(),
+            blockedBy: adminId,
+            blockReason: reason || 'No reason provided'
+        });
+
+        res.status(200).json({
+            message: "User suspended successfully",
+            user: {
+                id: userToSuspend.id,
+                email: userToSuspend.email,
+                firstName: userToSuspend.firstName,
+                surname: userToSuspend.surname,
+                status: 'suspended',
+                blockedAt: userToSuspend.blockedAt,
+                blockReason: userToSuspend.blockReason
+            }
+        });
+
+    } catch (error) {
+        console.error('Suspend user error:', error);
+        res.status(500).json({ 
+            message: "Server error", 
+            error: error.message 
+        });
+    }
+};
+
+// Get blocked/suspended users (Admin only)
+exports.getBlockedUsers = async (req, res) => {
+    try {
+        const { status } = req.query; // 'blocked', 'suspended', or 'all'
+
+        let whereClause = {};
+        if (status === 'blocked') {
+            whereClause = { status: 'blocked' };
+        } else if (status === 'suspended') {
+            whereClause = { status: 'suspended' };
+        } else if (status === 'all') {
+            whereClause = { 
+                status: { [Op.in]: ['blocked', 'suspended'] }
+            };
+        } else {
+            // Default to blocked users
+            whereClause = { 
+                [Op.or]: [
+                    { isBlocked: true },
+                    { status: { [Op.in]: ['blocked', 'suspended'] }}
+                ]
+            };
+        }
+
+        const blockedUsers = await User.findAll({
+            where: whereClause,
+            attributes: [
+                'id', 'firstName', 'middleName', 'surname', 'email', 'role',
+                'isBlocked', 'status', 'blockedAt', 'blockedBy', 'blockReason',
+                'createdAt'
+            ],
+            include: [
+                {
+                    model: User,
+                    as: 'BlockedByUser',
+                    attributes: ['id', 'firstName', 'surname', 'email'],
+                    required: false
+                }
+            ],
+            order: [['blockedAt', 'DESC']]
+        });
+
+        res.status(200).json({
+            message: "Blocked users retrieved successfully",
+            count: blockedUsers.length,
+            users: blockedUsers
+        });
+
+    } catch (error) {
+        console.error('Get blocked users error:', error);
         res.status(500).json({ 
             message: "Server error", 
             error: error.message 

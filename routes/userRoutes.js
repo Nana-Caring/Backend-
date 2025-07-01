@@ -11,6 +11,10 @@ const {
   updateProfile,
   getUserProfile,
   getProfileCompletionStatus,
+  blockUser,
+  unblockUser,
+  suspendUser,
+  getBlockedUsers,
   validateProfileUpdate
 } = require('../controllers/userController');
 

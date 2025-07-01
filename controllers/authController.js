@@ -324,6 +324,39 @@ exports.login = async (req, res) => {
         return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Check if user is blocked or suspended
+    if (user.isBlocked || user.status === 'blocked') {
+        return res.status(403).json({ 
+            error: 'Account blocked',
+            message: 'Your account has been blocked. Please contact support.',
+            code: 'ACCOUNT_BLOCKED',
+            details: {
+                blockedAt: user.blockedAt,
+                reason: user.blockReason || 'No reason provided'
+            }
+        });
+    }
+
+    if (user.status === 'suspended') {
+        return res.status(403).json({ 
+            error: 'Account suspended',
+            message: 'Your account has been suspended. Please contact support.',
+            code: 'ACCOUNT_SUSPENDED',
+            details: {
+                blockedAt: user.blockedAt,
+                reason: user.blockReason || 'No reason provided'
+            }
+        });
+    }
+
+    if (user.status === 'pending') {
+        return res.status(403).json({ 
+            error: 'Account pending',
+            message: 'Your account is pending activation. Please contact support.',
+            code: 'ACCOUNT_PENDING'
+        });
+    }
+
     // Check password
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
