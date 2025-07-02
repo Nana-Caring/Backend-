@@ -10,12 +10,30 @@ exports.getMyBeneficiaries = async (req, res) => {
         {
           model: db.User,
           as: 'dependent',
-          attributes: ['id', 'firstName', 'middleName', 'email']
+          attributes: ['id', 'firstName', 'middleName', 'email'],
+          include:[
+            {
+              model: db.Account,
+              as: 'accounts',
+              attributes: ['accountNumber', 'accountType']
+            }
+          ]
         }
       ]
     });
     
-    const beneficiaries = linkedDependents.map(entry => entry.dependent);
+   const beneficiaries = linkedDependents.map(entry => {
+    const dep = entry.dependent;
+    const account = dep.accounts && dep.accounts[0];
+    return {
+    id: dep.id,
+    firstName: dep.firstName,
+    middleName: dep.middleName,
+    email: dep.email,
+    accountNumber: account ? account.accountNumber : null,
+    accountType: account ? account.accountType : null
+  };
+});
 
     res.status(200).json({ beneficiaries });
   } catch (error) {
