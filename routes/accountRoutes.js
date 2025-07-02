@@ -12,8 +12,12 @@ router.get('/balance/number/:accountNumber', [auth, checkUserStatus], accountCon
 router.get('/type/:accountType', [auth, checkUserStatus], accountController.getAccountsByType);
 router.get('/summary/:accountId', [auth, checkUserStatus], accountController.getAccountSummary);
 
+// Dependent routes - for dependents to access their own accounts only
+router.get('/dependent/my-accounts', [auth, checkUserStatus], accountController.getDependentOwnAccounts);
+
 // Caregiver routes for dependent accounts
-router.get('/dependent/:dependentId', [auth, checkUserStatus], accountController.getDependentAccounts);
+router.get('/caregiver/dependent/:dependentId', [auth, checkUserStatus], accountController.getDependentAccounts);
+router.get('/caregiver/all-dependents', [auth, checkUserStatus], accountController.getAllDependentsAccounts);
 
 // Admin routes (require admin role)
 router.get('/admin/all', [auth, isAdmin], accountController.getAllAccounts);

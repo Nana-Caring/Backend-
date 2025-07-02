@@ -5,8 +5,8 @@ class Account extends Model {}
 
 Account.init({
   id: {
-    type: DataTypes.INTEGER,
-    autoIncrement: true,
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
     allowNull: false
   },
@@ -47,7 +47,7 @@ Account.init({
     allowNull: true,
   },
   parentAccountId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.UUID,
     allowNull: true,
   }
 }, {
