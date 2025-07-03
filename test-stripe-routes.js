@@ -90,18 +90,10 @@ async function testStripeRoutes() {
         console.log('\n🚀 Testing Route Endpoints:');
         const app = createTestApp();
 
-        // Get a test user for authentication
+        // Get a test user for authentication (using mock data to avoid DB issues)
         let testUser;
-        try {
-            testUser = await User.findOne({ where: { role: 'funder' } });
-            if (!testUser) {
-                console.log('   ⚠️  No funder user found for testing. Creating mock user...');
-                testUser = { id: 1, role: 'funder', email: 'test@example.com' };
-            }
-        } catch (error) {
-            console.log('   ⚠️  Database not available, using mock user');
-            testUser = { id: 1, role: 'funder', email: 'test@example.com' };
-        }
+        console.log('   ⚠️  Using mock user for testing (avoiding database connection)');
+        testUser = { id: 1, role: 'funder', email: 'test@example.com' };
 
         const testToken = generateTestToken(testUser.id, testUser.role);
 
