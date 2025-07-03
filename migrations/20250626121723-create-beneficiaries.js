@@ -18,7 +18,7 @@ module.exports = {
         allowNull: false
       },
       funderId: {
-        type: Sequelize.UUID,
+        type: Sequelize.INTEGER,
         allowNull: false,
         references: {
           model: 'Users',

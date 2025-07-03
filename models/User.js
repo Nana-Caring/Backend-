@@ -133,6 +133,12 @@ const User = sequelize.define('User', {
 });
 
 User.associate = function(models) {
+  // User can have many accounts
+  User.hasMany(models.Account, {
+    foreignKey: 'userId',
+    as: 'Accounts'
+  });
+  
   User.belongsToMany(models.User, {
     as: 'Dependents',
     through: 'FunderDependent',
