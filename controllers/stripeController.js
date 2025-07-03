@@ -5,7 +5,7 @@ const Account = db.Account;
 const User = db.User;
 const FunderDependent = db.FunderDependent;
 
-
+// Create PaymentIntent endpoint
 const createPaymentIntent = async (req, res) => {
   try {
     const funderId = req.user.id;
@@ -69,7 +69,42 @@ const createPaymentIntent = async (req, res) => {
   }
 };
 
+// Create SetupIntent endpoint
+const createSetupIntent = async (req, res) => {
+  try {
+    const user = await db.User.findByPk(req.user.id);
+    if (!user || !user.stripeCustomerId) {
+      return res.status(404).json({ error: 'Stripe customer not found for user' });
+    }
+    const setupIntent = await stripe.setupIntents.create({
+      customer: user.stripeCustomerId,
+    });
+    res.json({ clientSecret: setupIntent.client_secret });
+  } catch (error) {
+    console.error('SetupIntent Error:', error.message);
+    res.status(500).json({ error: 'Failed to create SetupIntent' });
+  }
+};
 
+// List saved payment methods endpoint
+const listPaymentMethods = async (req, res) => {
+  try {
+    const user = await db.User.findByPk(req.user.id);
+    if (!user || !user.stripeCustomerId) {
+      return res.status(404).json({ error: 'Stripe customer not found for user' });
+    }
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: user.stripeCustomerId,
+      type: 'card',
+    });
+    res.json({ paymentMethods: paymentMethods.data });
+  } catch (error) {
+    console.error('ListPaymentMethods Error:', error.message);
+    res.status(500).json({ error: 'Failed to list payment methods' });
+  }
+};
+
+// Stripe webhook handler
 const handleWebhook = async (req, res) => {
     const sig = req.headers['stripe-signature'];
     let event;
@@ -83,19 +118,19 @@ const handleWebhook = async (req, res) => {
 
         // Handle the event
         if(event.type === 'payment_intent.succeeded') {
-                // Handle successful payment
-                const paymentIntent = event.data.object;
-                const accountNumber = paymentIntent.metadata.accountNumber;
-                const accountType = paymentIntent.metadata.accountType;
-                const amount = paymentIntent.amount / 100; // Convert cents to ZAR
+            // Handle successful payment
+            const paymentIntent = event.data.object;
+            const accountNumber = paymentIntent.metadata.accountNumber;
+            const accountType = paymentIntent.metadata.accountType;
+            const amount = paymentIntent.amount / 100; // Convert cents to ZAR
 
-                try {
-                    // Update the account balance in the database
-                    const account = await Account.findOne({ where: { accountNumber, accountType } });
+            try {
+                // Update the account balance in the database
+                const account = await Account.findOne({ where: { accountNumber, accountType } });
 
-                    if (!account) {
-                        console.error(`Account ${accountNumber} (${accountType}) not found.`);
-                   } else {
+                if (!account) {
+                    console.error(`Account ${accountNumber} (${accountType}) not found.`);
+                } else {
                     // update the account balance
                     account.balance += amount;
                     await account.save();
@@ -118,7 +153,9 @@ const handleWebhook = async (req, res) => {
 
 module.exports = {
     createPaymentIntent,
-    handleWebhook
+    handleWebhook,
+    createSetupIntent,
+    listPaymentMethods
 };
 
 
