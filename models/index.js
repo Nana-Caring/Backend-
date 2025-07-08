@@ -18,14 +18,14 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
 // Import models
 const User = require('./User');
 const Account = require('./Account');
-const BankAccount = require('./BankAccount');
+const PaymentCard = require('./PaymentCard');
 const Transaction = require('./Transaction')(sequelize, Sequelize.DataTypes);
 const FunderDependent = require('./FunderDependent')(sequelize, Sequelize.DataTypes);
 
 const models = {
     User,
     Account,
-    BankAccount,
+    PaymentCard,
     Transaction,
     FunderDependent
 };
@@ -41,13 +41,13 @@ Account.belongsTo(User, {
     as: 'user'
 });
 
-// BankAccount associations
-User.hasMany(BankAccount, {
+// PaymentCard associations
+User.hasMany(PaymentCard, {
     foreignKey: 'userId',
-    as: 'bankAccounts'
+    as: 'paymentCards'
 });
 
-BankAccount.belongsTo(User, {
+PaymentCard.belongsTo(User, {
     foreignKey: 'userId',
     as: 'user'
 });
