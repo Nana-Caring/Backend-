@@ -127,6 +127,12 @@ const User = sequelize.define('User', {
   homeCode: {
     type: DataTypes.STRING(10),
     allowNull: true
+  },
+  // Stripe integration fields
+  stripeCustomerId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'Stripe customer ID for payment processing'
   }
 }, {
   timestamps: true
@@ -137,6 +143,12 @@ User.associate = function(models) {
   User.hasMany(models.Account, {
     foreignKey: 'userId',
     as: 'Accounts'
+  });
+  
+  // User can have many bank accounts
+  User.hasMany(models.BankAccount, {
+    foreignKey: 'userId',
+    as: 'BankAccounts'
   });
   
   User.belongsToMany(models.User, {

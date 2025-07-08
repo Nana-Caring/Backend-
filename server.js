@@ -12,6 +12,7 @@ const adminRoutes = require('./routes/admin');
 const funderRoutes = require('./routes/funderRoutes');
 const statsRoutes = require('./routes/statsRoutes');
 const accountRoutes = require('./routes/accountRoutes');
+const bankAccountRoutes = require('./routes/bankAccountRoutes');
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use('/admin', adminRoutes);
 app.use('/api/funder', funderRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/accounts', accountRoutes);
+app.use('/api/bank-accounts', bankAccountRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
