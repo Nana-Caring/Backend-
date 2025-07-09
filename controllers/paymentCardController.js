@@ -197,31 +197,45 @@ const getPaymentCards = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const cards = await PaymentCard.findAll({
-      where: {
-        userId,
-        isActive: true
-      },
-      order: [['isDefault', 'DESC'], ['createdAt', 'DESC']]
-    });
+    // Check if payment_cards table exists
+    try {
+      const cards = await PaymentCard.findAll({
+        where: {
+          userId,
+          isActive: true
+        },
+        order: [['isDefault', 'DESC'], ['createdAt', 'DESC']]
+      });
 
-    // Mask card numbers for security
-    const maskedCards = cards.map(card => ({
-      id: card.id,
-      bankName: card.bankName,
-      cardNumber: maskCardNumber(card.cardNumber),
-      expiryDate: card.expiryDate,
-      nickname: card.nickname,
-      isDefault: card.isDefault,
-      isActive: card.isActive,
-      createdAt: card.createdAt
-    }));
+      // Mask card numbers for security
+      const maskedCards = cards.map(card => ({
+        id: card.id,
+        bankName: card.bankName,
+        cardNumber: maskCardNumber(card.cardNumber),
+        expiryDate: card.expiryDate,
+        nickname: card.nickname,
+        isDefault: card.isDefault,
+        isActive: card.isActive,
+        createdAt: card.createdAt
+      }));
 
-    res.json({
-      message: 'Payment cards retrieved successfully',
-      cards: maskedCards,
-      totalCards: maskedCards.length
-    });
+      res.json({
+        message: 'Payment cards retrieved successfully',
+        cards: maskedCards,
+        totalCards: maskedCards.length
+      });
+
+    } catch (dbError) {
+      // Handle case where payment_cards table doesn't exist
+      if (dbError.original && dbError.original.code === '42P01') {
+        return res.status(503).json({
+          message: 'Payment cards feature is not available yet',
+          error: 'Database table not created. Please run migrations or contact administrator.',
+          hint: 'Run: npx sequelize-cli db:migrate or execute the SQL script to create payment_cards table'
+        });
+      }
+      throw dbError; // Re-throw other database errors
+    }
 
   } catch (error) {
     console.error('Get payment cards error:', error);
