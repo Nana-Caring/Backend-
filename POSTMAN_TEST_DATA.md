@@ -230,6 +230,36 @@ Authorization: Bearer {{AUTH_TOKEN}}
 }
 ```
 
+## 🎉 **MONEY TRANSFER FEATURE ADDED!** 💸
+
+### 🚀 **NEW CAPABILITY: Send Money to Beneficiaries**
+
+Funders can now use their added payment cards to send money directly to their beneficiaries! Here are the new endpoints:
+
+#### **Transfer Endpoints:**
+- `POST /api/transfers/send-to-beneficiary` - Send money using payment card
+- `GET /api/transfers/beneficiaries` - Get linked beneficiaries
+- `GET /api/transfers/history` - View transfer history  
+- `GET /api/transfers/info` - Get limits and fees
+
+#### **Example Transfer Request:**
+```json
+POST /api/transfers/send-to-beneficiary
+{
+  "cardId": "your-card-uuid",
+  "beneficiaryId": 12,
+  "amount": 500.00,
+  "description": "Monthly allowance"
+}
+```
+
+#### **Transfer Limits:**
+- Minimum: R10.00
+- Maximum: R5,000.00 per transaction
+- Daily limit: R20,000.00
+
+See `TRANSFER_API_TEST_DATA.md` for complete testing guide! 🧪
+
 ### SOLUTION FOR STRIPE ERROR ✅
 
 **✅ VALIDATION ERROR FIXED!**
@@ -442,6 +472,82 @@ Copy this into Postman as a collection:
           "path": ["api", "payment-cards", "my-cards"]
         }
       }
+    },
+    {
+      "name": "5. Get Beneficiaries",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{AUTH_TOKEN}}"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/transfers/beneficiaries",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "transfers", "beneficiaries"]
+        }
+      }
+    },
+    {
+      "name": "6. Send Money to Beneficiary",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{AUTH_TOKEN}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cardId\": \"{{CARD_ID}}\",\n  \"beneficiaryId\": \"{{BENEFICIARY_ID}}\",\n  \"amount\": 100.00,\n  \"description\": \"Test transfer - grocery money\"\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/api/transfers/send-to-beneficiary",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "transfers", "send-to-beneficiary"]
+        }
+      }
+    },
+    {
+      "name": "7. Get Transfer History",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{AUTH_TOKEN}}"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/transfers/history",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "transfers", "history"]
+        }
+      }
+    },
+    {
+      "name": "8. Get Transfer Info",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{AUTH_TOKEN}}"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/transfers/info",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "transfers", "info"]
+        }
+      }
     }
   ]
 }
@@ -482,4 +588,390 @@ Copy this into Postman as a collection:
 - ✅ `DELETE /api/payment-cards/remove/:cardId` - Remove card
 - ✅ `POST /api/payment-cards/create-payment-intent` - Create payment
 
-### ⚡ **Ready to Test Cards:**
+### 💸 **MONEY TRANSFER ENDPOINTS:**
+
+- ✅ `POST /api/transfers/send-to-beneficiary` - **Send money from card to beneficiary**
+- ✅ `GET /api/transfers/beneficiaries` - Get linked beneficiaries list
+- ✅ `GET /api/transfers/history` - View transfer history
+- ✅ `GET /api/transfers/info` - Get transfer limits and fees
+
+## 💰 **MONEY TRANSFER API - POSTMAN TESTING**
+
+### Step 8: Get Beneficiaries List
+**Request:** `GET {{BASE_URL}}/api/transfers/beneficiaries`
+
+**Headers:**
+```
+Authorization: Bearer {{AUTH_TOKEN}}
+```
+
+**Success Response (200):**
+```json
+{
+  "message": "Beneficiaries retrieved successfully",
+  "beneficiaries": [
+    {
+      "id": 12,
+      "name": "John Doe",
+      "email": "john@example.com",
+      "account": {
+        "id": "uuid-here",
+        "accountNumber": "1234567890",
+        "balance": 1000.00,
+        "currency": "ZAR"
+      },
+      "hasActiveAccount": true
+    }
+  ],
+  "totalBeneficiaries": 1
+}
+```
+
+### Step 9: Send Money to Beneficiary
+**Request:** `POST {{BASE_URL}}/api/transfers/send-to-beneficiary`
+
+**Headers:**
+```
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+```
+
+**Body (raw JSON) - Test Transfer #1:**
+```json
+{
+  "cardId": "{{CARD_ID}}",
+  "beneficiaryId": 12,
+  "amount": 100.00,
+  "description": "Test transfer - grocery money"
+}
+```
+
+**Body (raw JSON) - Test Transfer #2:**
+```json
+{
+  "cardId": "{{CARD_ID}}",
+  "beneficiaryId": 12,
+  "amount": 500.00,
+  "description": "Monthly allowance"
+}
+```
+
+**Body (raw JSON) - Test Transfer #3:**
+```json
+{
+  "cardId": "{{CARD_ID}}",
+  "beneficiaryId": 12,
+  "amount": 250.00,
+  "description": "Emergency funds"
+}
+```
+
+**Success Response (201):**
+```json
+{
+  "message": "Money sent successfully",
+  "transfer": {
+    "transactionRef": "TXN123456ABC",
+    "amount": 100.00,
+    "currency": "ZAR",
+    "fromCard": {
+      "bankName": "Standard Bank",
+      "cardNumber": "****-****-****-1111",
+      "nickname": "My Standard Bank Visa"
+    },
+    "toBeneficiary": {
+      "name": "John Doe",
+      "accountNumber": "1234567890"
+    },
+    "status": "completed",
+    "timestamp": "2025-07-09T10:30:00.000Z",
+    "description": "Test transfer - grocery money"
+  },
+  "balanceUpdate": {
+    "beneficiaryNewBalance": 1100.00
+  }
+}
+```
+
+### Step 10: Get Transfer History
+**Request:** `GET {{BASE_URL}}/api/transfers/history`
+
+**Headers:**
+```
+Authorization: Bearer {{AUTH_TOKEN}}
+```
+
+**Query Parameters (optional):**
+- `?page=1` - Page number
+- `?limit=10` - Items per page
+- `?beneficiaryId=12` - Filter by specific beneficiary
+
+**Examples:**
+```
+GET {{BASE_URL}}/api/transfers/history
+GET {{BASE_URL}}/api/transfers/history?page=1&limit=5
+GET {{BASE_URL}}/api/transfers/history?beneficiaryId=12
+```
+
+**Success Response (200):**
+```json
+{
+  "message": "Transfer history retrieved successfully",
+  "transfers": [
+    {
+      "id": 123,
+      "transactionRef": "TXN123456ABC",
+      "amount": 100.00,
+      "currency": "ZAR",
+      "beneficiary": {
+        "id": 12,
+        "name": "John Doe",
+        "accountNumber": "1234567890"
+      },
+      "status": "completed",
+      "timestamp": "2025-07-09T10:30:00.000Z",
+      "description": "Test transfer - grocery money"
+    }
+  ],
+  "pagination": {
+    "currentPage": 1,
+    "totalPages": 1,
+    "totalTransfers": 1,
+    "hasNextPage": false,
+    "hasPrevPage": false
+  }
+}
+```
+
+### Step 11: Get Transfer Information
+**Request:** `GET {{BASE_URL}}/api/transfers/info`
+
+**Headers:**
+```
+Authorization: Bearer {{AUTH_TOKEN}}
+```
+
+**Success Response (200):**
+```json
+{
+  "message": "Transfer information retrieved successfully",
+  "limits": {
+    "minimum": 10.00,
+    "maximum": 5000.00,
+    "dailyLimit": 20000.00,
+    "currency": "ZAR"
+  },
+  "fees": {
+    "transferFee": 0.00,
+    "stripeProcessingFee": "2.9% + R2.00",
+    "currency": "ZAR"
+  },
+  "processingTime": {
+    "standard": "Instant",
+    "description": "Transfers are processed immediately upon successful payment"
+  }
+}
+```
+
+## 🧪 **TRANSFER ERROR RESPONSES**
+
+### Missing Required Fields (400):
+```json
+{
+  "message": "All fields are required",
+  "required": {
+    "cardId": "Payment card ID is required",
+    "beneficiaryId": "Beneficiary ID is required",
+    "amount": "Transfer amount is required"
+  }
+}
+```
+
+### Invalid Amount (400):
+```json
+{
+  "message": "Amount must be a positive number"
+}
+```
+
+### Minimum Amount Error (400):
+```json
+{
+  "message": "Minimum transfer amount is R10.00"
+}
+```
+
+### Maximum Amount Error (400):
+```json
+{
+  "message": "Maximum transfer amount is R5,000.00 per transaction"
+}
+```
+
+### Card Not Found (404):
+```json
+{
+  "message": "Payment card not found or inactive"
+}
+```
+
+### Beneficiary Not Found (404):
+```json
+{
+  "message": "Beneficiary not found"
+}
+```
+
+### Unauthorized Beneficiary (403):
+```json
+{
+  "message": "You are not authorized to send money to this beneficiary"
+}
+```
+
+### Payment Failed (400):
+```json
+{
+  "message": "Payment processing failed",
+  "error": "Card payment could not be processed"
+}
+```
+
+## 📋 **COMPLETE TRANSFER TESTING WORKFLOW**
+
+### 1. Setup Phase:
+```
+1. Login → Get JWT token
+2. Add payment card → Get card ID
+3. Get beneficiaries → Get beneficiary ID
+4. Check transfer info → Understand limits
+```
+
+### 2. Transfer Phase:
+```
+1. Send small amount (R50) → Test basic functionality
+2. Send medium amount (R500) → Test normal transfer
+3. Send large amount (R2000) → Test higher amounts
+4. Check history → Verify all transfers
+```
+
+### 3. Error Testing:
+```
+1. Send R5 → Test minimum limit
+2. Send R10000 → Test maximum limit
+3. Use wrong beneficiary ID → Test authorization
+4. Use invalid card ID → Test card validation
+```
+
+## 🔧 **POSTMAN COLLECTION JSON FOR TRANSFERS**
+
+Add these to your existing Postman collection:
+
+```json
+{
+  "name": "5. Get Beneficiaries",
+  "request": {
+    "method": "GET",
+    "header": [
+      {
+        "key": "Authorization",
+        "value": "Bearer {{AUTH_TOKEN}}"
+      }
+    ],
+    "url": {
+      "raw": "{{BASE_URL}}/api/transfers/beneficiaries",
+      "host": ["{{BASE_URL}}"],
+      "path": ["api", "transfers", "beneficiaries"]
+    }
+  }
+},
+{
+  "name": "6. Send Money to Beneficiary",
+  "request": {
+    "method": "POST",
+    "header": [
+      {
+        "key": "Content-Type",
+        "value": "application/json"
+      },
+      {
+        "key": "Authorization",
+        "value": "Bearer {{AUTH_TOKEN}}"
+      }
+    ],
+    "body": {
+      "mode": "raw",
+      "raw": "{\n  \"cardId\": \"{{CARD_ID}}\",\n  \"beneficiaryId\": \"{{BENEFICIARY_ID}}\",\n  \"amount\": 100.00,\n  \"description\": \"Test transfer - grocery money\"\n}"
+    },
+    "url": {
+      "raw": "{{BASE_URL}}/api/transfers/send-to-beneficiary",
+      "host": ["{{BASE_URL}}"],
+      "path": ["api", "transfers", "send-to-beneficiary"]
+    }
+  }
+},
+{
+  "name": "7. Get Transfer History",
+  "request": {
+    "method": "GET",
+    "header": [
+      {
+        "key": "Authorization",
+        "value": "Bearer {{AUTH_TOKEN}}"
+      }
+    ],
+    "url": {
+      "raw": "{{BASE_URL}}/api/transfers/history",
+      "host": ["{{BASE_URL}}"],
+      "path": ["api", "transfers", "history"]
+    }
+  }
+},
+{
+  "name": "8. Get Transfer Info",
+  "request": {
+    "method": "GET",
+    "header": [
+      {
+        "key": "Authorization",
+        "value": "Bearer {{AUTH_TOKEN}}"
+      }
+    ],
+    "url": {
+      "raw": "{{BASE_URL}}/api/transfers/info",
+      "host": ["{{BASE_URL}}"],
+      "path": ["api", "transfers", "info"]
+    }
+  }
+}
+```
+
+## 💡 **TRANSFER TESTING TIPS**
+
+### 🎯 **Before Testing Transfers:**
+1. **Ensure you have a funder account** logged in
+2. **Add at least one payment card** using the test endpoint
+3. **Verify you have linked beneficiaries** (dependents)
+4. **Check beneficiaries have active accounts**
+
+### 🚀 **Testing Steps:**
+1. **Get beneficiaries first** → Note the beneficiary ID and account number
+2. **Get your cards** → Note the card ID
+3. **Send a small test amount** (R50) → Verify basic functionality
+4. **Check transfer history** → Confirm the transfer appears
+5. **Send larger amounts** → Test different scenarios
+
+### ⚠️ **Important Notes:**
+- Replace `{{CARD_ID}}` with actual card ID from your cards list
+- Replace `{{BENEFICIARY_ID}}` with actual beneficiary ID from beneficiaries list
+- Amounts must be between R10.00 and R5,000.00
+- You can only send money to your linked beneficiaries
+- All transfers are processed through Stripe (test mode)
+
+### 🔍 **Variables to Set in Postman:**
+```
+BASE_URL: http://localhost:5000
+AUTH_TOKEN: (auto-set from login)
+CARD_ID: (copy from cards response)
+BENEFICIARY_ID: (copy from beneficiaries response)
+```

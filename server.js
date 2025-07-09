@@ -13,6 +13,7 @@ const funderRoutes = require('./routes/funderRoutes');
 const statsRoutes = require('./routes/statsRoutes');
 const accountRoutes = require('./routes/accountRoutes');
 const paymentCardRoutes = require('./routes/paymentCardRoutes');
+const transferRoutes = require('./routes/transferRoutes');
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/funder', funderRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/payment-cards', paymentCardRoutes);
+app.use('/api/transfers', transferRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

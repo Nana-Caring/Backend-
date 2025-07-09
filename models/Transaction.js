@@ -21,6 +21,19 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.ENUM('Debit', 'Credit'),
             allowNull: false
         },
+        description: {
+            type: DataTypes.STRING,
+            allowNull: true
+        },
+        reference: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            unique: true
+        },
+        metadata: {
+            type: DataTypes.JSON,
+            allowNull: true
+        },
         timestamp: {
             type: DataTypes.DATE,
             defaultValue: DataTypes.NOW
