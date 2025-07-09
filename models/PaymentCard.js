@@ -29,10 +29,10 @@ const PaymentCard = sequelize.define('PaymentCard', {
     comment: 'Bank Name * - Enter bank name'
   },
   cardNumber: {
-    type: DataTypes.STRING(19),
+    type: DataTypes.STRING(4),
     allowNull: false,
     validate: {
-      len: [13, 19],
+      len: [4, 4], // Only last 4 digits stored
       isNumeric: {
         msg: 'Card number must contain only numbers'
       },
@@ -40,7 +40,7 @@ const PaymentCard = sequelize.define('PaymentCard', {
         msg: 'Card number is required'
       }
     },
-    comment: 'Card Number - Enter card number'
+    comment: 'Card Number - Last 4 digits only for security'
   },
   expiryDate: {
     type: DataTypes.STRING(5),

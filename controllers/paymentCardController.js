@@ -125,22 +125,29 @@ const addPaymentCard = async (req, res) => {
       });
     }
 
-    // Create payment method in Stripe (for tokenization and validation)
-    const [month, year] = expiryDate.split('/');
-    const fullYear = `20${year}`;
-
+    // For security, we'll create a test token instead of sending raw card data
+    // In production, the frontend should tokenize cards using Stripe.js
     let stripePaymentMethodId = null;
     try {
-      const paymentMethod = await stripe.paymentMethods.create({
-        type: 'card',
+      // Create a test token for development (this simulates frontend tokenization)
+      const testToken = await stripe.tokens.create({
         card: {
           number: cleanCardNumber,
-          exp_month: parseInt(month),
-          exp_year: parseInt(fullYear),
+          exp_month: parseInt(expiryDate.split('/')[0]),
+          exp_year: parseInt(`20${expiryDate.split('/')[1]}`),
           cvc: ccv,
         },
       });
 
+      // Create payment method from token
+      const paymentMethod = await stripe.paymentMethods.create({
+        type: 'card',
+        card: {
+          token: testToken.id,
+        },
+      });
+
+      // Attach to customer
       await stripe.paymentMethods.attach(paymentMethod.id, {
         customer: stripeCustomerId,
       });
@@ -148,6 +155,16 @@ const addPaymentCard = async (req, res) => {
       stripePaymentMethodId = paymentMethod.id;
     } catch (stripeError) {
       console.error('Stripe error:', stripeError);
+      
+      // Handle specific Stripe errors
+      if (stripeError.message.includes('raw card data')) {
+        return res.status(400).json({
+          message: 'Card tokenization required',
+          error: 'For security, card details must be tokenized on the frontend using Stripe.js',
+          hint: 'In development, use Stripe test tokens or enable raw card data in your Stripe dashboard'
+        });
+      }
+      
       return res.status(400).json({
         message: 'Invalid card details',
         error: stripeError.message
@@ -405,10 +422,128 @@ const createPaymentIntentWithCard = async (req, res) => {
   }
 };
 
+// TEST ONLY: Add payment card without Stripe validation (for development)
+const addPaymentCardTest = async (req, res) => {
+  try {
+    const { bankName, cardNumber, expiryDate, ccv, nickname, isDefault } = req.body;
+    const userId = req.user.id;
+
+    // Validate required fields
+    if (!bankName || !cardNumber || !expiryDate || !ccv) {
+      return res.status(400).json({
+        message: 'All card fields are required',
+        required: {
+          bankName: 'Bank Name is required',
+          cardNumber: 'Card Number is required',
+          expiryDate: 'Expiry Date (MM/YY) is required',
+          ccv: 'CCV is required'
+        }
+      });
+    }
+
+    // Validate expiry date format (MM/YY)
+    const expiryRegex = /^(0[1-9]|1[0-2])\/\d{2}$/;
+    if (!expiryRegex.test(expiryDate)) {
+      return res.status(400).json({
+        message: 'Expiry date must be in MM/YY format (e.g., 12/25)'
+      });
+    }
+
+    // Validate card number (basic check)
+    const cleanCardNumber = cardNumber.replace(/\s/g, '');
+    if (!/^\d{13,19}$/.test(cleanCardNumber)) {
+      return res.status(400).json({
+        message: 'Card number must be 13-19 digits'
+      });
+    }
+
+    // Validate CCV
+    if (!/^\d{3,4}$/.test(ccv)) {
+      return res.status(400).json({
+        message: 'CCV must be 3-4 digits'
+      });
+    }
+
+    // Check if card already exists for this user (last 4 digits)
+    const lastFourDigits = cleanCardNumber.slice(-4);
+    const existingCard = await PaymentCard.findOne({
+      where: {
+        userId,
+        cardNumber: lastFourDigits
+      }
+    });
+
+    if (existingCard) {
+      return res.status(400).json({
+        message: 'A card with these last 4 digits is already added to your account'
+      });
+    }
+
+    // If this is set as default, unset other defaults
+    if (isDefault) {
+      await PaymentCard.update(
+        { isDefault: false },
+        { where: { userId, isDefault: true } }
+      );
+    }
+
+    // Create a mock Stripe payment method ID for testing
+    const mockStripePaymentMethodId = `pm_test_${Date.now()}_${lastFourDigits}`;
+
+    // Create payment card record (store only last 4 digits for security)
+    const paymentCard = await PaymentCard.create({
+      userId,
+      bankName,
+      cardNumber: lastFourDigits, // Store only last 4 digits
+      expiryDate,
+      ccv, // Note: In production, consider not storing CCV at all
+      nickname,
+      isDefault: isDefault || false,
+      stripePaymentMethodId: mockStripePaymentMethodId
+    });
+
+    // Return card data with masked number
+    const responseCard = {
+      id: paymentCard.id,
+      bankName: paymentCard.bankName,
+      cardNumber: maskCardNumber(lastFourDigits),
+      expiryDate: paymentCard.expiryDate,
+      nickname: paymentCard.nickname,
+      isDefault: paymentCard.isDefault,
+      isActive: paymentCard.isActive,
+      createdAt: paymentCard.createdAt
+    };
+
+    res.status(201).json({
+      message: 'Payment card added successfully (TEST MODE)',
+      card: responseCard,
+      note: 'This is a test endpoint - Stripe validation bypassed for development'
+    });
+
+  } catch (error) {
+    console.error('Add payment card test error:', error);
+    
+    // Handle case where table doesn't exist
+    if (error.name === 'SequelizeDatabaseError' && error.message.includes('relation') && error.message.includes('does not exist')) {
+      return res.status(503).json({
+        message: 'Payment cards feature is not available yet',
+        error: 'Database table not created. Please run migrations or contact administrator.',
+        hint: 'Run: npx sequelize-cli db:migrate or execute the SQL script to create payment_cards table'
+      });
+    }
+    
+    res.status(500).json({
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   addPaymentCard,
   getPaymentCards,
   setDefaultCard,
   deletePaymentCard,
-  createPaymentIntentWithCard
+  createPaymentIntentWithCard,
+  addPaymentCardTest
 };

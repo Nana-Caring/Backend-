@@ -8,6 +8,7 @@ router.use(auth);
 
 // Payment card management routes
 router.post('/add', paymentCardController.addPaymentCard);
+router.post('/add-test', paymentCardController.addPaymentCardTest); // TEST ONLY - bypasses Stripe
 router.get('/my-cards', paymentCardController.getPaymentCards);
 router.put('/set-default/:cardId', paymentCardController.setDefaultCard);
 router.delete('/remove/:cardId', paymentCardController.deletePaymentCard);
