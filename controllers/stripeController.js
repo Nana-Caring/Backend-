@@ -1,8 +1,10 @@
 const db = require('../models');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { createStripeCustomer } = require('./bankAccountController');
 
 const Account = db.Account;
 const User = db.User;
+const BankAccount = db.BankAccount;
 const FunderDependent = db.FunderDependent;
 
 // Create PaymentIntent endpoint
@@ -73,26 +75,19 @@ const createPaymentIntent = async (req, res) => {
 const createSetupIntent = async (req, res) => {
   try {
     const user = await db.User.findByPk(req.user.id);
-    
-    // Check if user is a funder
-    if (!user || user.role !== 'funder') {
-      return res.status(403).json({ error: 'Only funders can save payment methods' });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
-    
-    // Create Stripe customer if doesn't exist
-    if (!user.stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        name: `${user.firstName} ${user.surname}`,
-      });
-      user.stripeCustomerId = customer.id;
-      await user.save();
-    }
-    
+
+    // Create or get Stripe customer
+    const stripeCustomer = await createStripeCustomer(user);
+
     const setupIntent = await stripe.setupIntents.create({
-      customer: user.stripeCustomerId,
+      customer: stripeCustomer.id,
+      usage: 'off_session',
+      payment_method_types: ['card']
     });
-    
+
     res.json({ clientSecret: setupIntent.client_secret });
   } catch (error) {
     console.error('SetupIntent Error:', error.message);
@@ -104,14 +99,42 @@ const createSetupIntent = async (req, res) => {
 const listPaymentMethods = async (req, res) => {
   try {
     const user = await db.User.findByPk(req.user.id);
-    if (!user || !user.stripeCustomerId) {
-      return res.status(404).json({ error: 'Stripe customer not found for user' });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
+
+    // Create or get Stripe customer
+    const stripeCustomer = await createStripeCustomer(user);
+
     const paymentMethods = await stripe.paymentMethods.list({
-      customer: user.stripeCustomerId,
+      customer: stripeCustomer.id,
       type: 'card',
     });
-    res.json({ paymentMethods: paymentMethods.data });
+
+    // Also get user's bank accounts
+    const bankAccounts = await BankAccount.findAll({
+      where: { 
+        userId: req.user.id,
+        isActive: true 
+      },
+      order: [['isDefault', 'DESC'], ['createdAt', 'ASC']]
+    });
+
+    const maskedBankAccounts = bankAccounts.map(account => ({
+      id: account.id,
+      accountName: account.accountName,
+      bankName: account.bankName,
+      accountNumber: `****${account.accountNumber.slice(-4)}`,
+      accountType: account.accountType,
+      isDefault: account.isDefault,
+      verificationStatus: account.verificationStatus,
+      type: 'bank_account'
+    }));
+
+    res.json({ 
+      paymentMethods: paymentMethods.data,
+      bankAccounts: maskedBankAccounts
+    });
   } catch (error) {
     console.error('ListPaymentMethods Error:', error.message);
     res.status(500).json({ error: 'Failed to list payment methods' });
