@@ -127,7 +127,13 @@ const User = sequelize.define('User', {
   homeCode: {
     type: DataTypes.STRING(10),
     allowNull: true
+  },
+  stripeCustomerId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
   }
+
 }, {
   timestamps: true
 });

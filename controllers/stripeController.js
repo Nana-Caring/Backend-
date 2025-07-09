@@ -73,12 +73,26 @@ const createPaymentIntent = async (req, res) => {
 const createSetupIntent = async (req, res) => {
   try {
     const user = await db.User.findByPk(req.user.id);
-    if (!user || !user.stripeCustomerId) {
-      return res.status(404).json({ error: 'Stripe customer not found for user' });
+    
+    // Check if user is a funder
+    if (!user || user.role !== 'funder') {
+      return res.status(403).json({ error: 'Only funders can save payment methods' });
     }
+    
+    // Create Stripe customer if doesn't exist
+    if (!user.stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        name: `${user.firstName} ${user.surname}`,
+      });
+      user.stripeCustomerId = customer.id;
+      await user.save();
+    }
+    
     const setupIntent = await stripe.setupIntents.create({
       customer: user.stripeCustomerId,
     });
+    
     res.json({ clientSecret: setupIntent.client_secret });
   } catch (error) {
     console.error('SetupIntent Error:', error.message);
