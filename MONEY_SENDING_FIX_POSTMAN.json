@@ -1,0 +1,206 @@
+{
+  "info": {
+    "name": "Money Sending Fix - Port 5000",
+    "description": "Test collection to fix money sending issue"
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "AUTH_TOKEN",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "CARD_ID",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "BENEFICIARY_ID",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Login (Update credentials)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    const response = pm.response.json();",
+              "    pm.collectionVariables.set('AUTH_TOKEN', response.token);",
+              "    console.log('Token saved:', response.token.substring(0,20) + '...');",
+              "    console.log('User ID:', response.user.id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"UPDATE_THIS_EMAIL\",\n  \"password\": \"UPDATE_THIS_PASSWORD\"\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/api/auth/login",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "2. Add Stripe Test Card (WORKS FOR TRANSFERS)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "    const response = pm.response.json();",
+              "    pm.collectionVariables.set('CARD_ID', response.card.id);",
+              "    console.log('Card ID saved:', response.card.id);",
+              "    console.log('Card:', response.card.cardNumber);",
+              "    console.log('Brand:', response.card.brand);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{AUTH_TOKEN}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"payment_method_id\": \"pm_card_visa\",\n  \"is_default\": true\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/api/payment-cards/add-stripe",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "payment-cards", "add-stripe"]
+        }
+      }
+    },
+    {
+      "name": "3. Get Beneficiaries",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    const response = pm.response.json();",
+              "    if (response.beneficiaries && response.beneficiaries.length > 0) {",
+              "        pm.collectionVariables.set('BENEFICIARY_ID', response.beneficiaries[0].id);",
+              "        console.log('Beneficiary ID saved:', response.beneficiaries[0].id);",
+              "        console.log('Beneficiary:', response.beneficiaries[0].name);",
+              "        console.log('Account:', response.beneficiaries[0].account.accountNumber);",
+              "        console.log('Balance: R' + response.beneficiaries[0].account.balance);",
+              "    } else {",
+              "        console.log('No beneficiaries found - add dependents first');",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{AUTH_TOKEN}}"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/transfers/beneficiaries",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "transfers", "beneficiaries"]
+        }
+      }
+    },
+    {
+      "name": "4. Send Money (THIS WILL WORK NOW)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "    const response = pm.response.json();",
+              "    console.log('🎉 MONEY SENT SUCCESSFULLY!');",
+              "    console.log('Transaction Ref:', response.transfer.transactionRef);",
+              "    console.log('Amount: R' + response.transfer.amount);",
+              "    console.log('To:', response.transfer.toBeneficiary.name);",
+              "    console.log('New Balance: R' + response.balanceUpdate.beneficiaryNewBalance);",
+              "} else {",
+              "    console.log('❌ Transfer failed - check response');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{AUTH_TOKEN}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cardId\": \"{{CARD_ID}}\",\n  \"beneficiaryId\": {{BENEFICIARY_ID}},\n  \"amount\": 50.00,\n  \"description\": \"Test transfer - money sending fix\"\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/api/transfers/send-to-beneficiary",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "transfers", "send-to-beneficiary"]
+        }
+      }
+    },
+    {
+      "name": "5. Check Transfer History",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{AUTH_TOKEN}}"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/transfers/history",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "transfers", "history"]
+        }
+      }
+    }
+  ]
+}

@@ -144,6 +144,25 @@ Authorization: Bearer {{AUTH_TOKEN}}
 }
 ```
 
+#### Request 1C: Add Stripe Test Card (RECOMMENDED FOR TRANSFERS) ✅
+**Request:** `POST {{BASE_URL}}/api/payment-cards/add-stripe`
+
+**Headers:**
+```
+Content-Type: application/json
+Authorization: Bearer {{AUTH_TOKEN}}
+```
+
+**Body (raw JSON):**
+```json
+{
+  "payment_method_id": "pm_card_visa",
+  "is_default": true
+}
+```
+
+**Why use this:** This endpoint creates real Stripe payment methods that work for money transfers!
+
 #### Request 2: Add FNB MasterCard (TEST ENDPOINT)
 **Request:** `POST {{BASE_URL}}/api/payment-cards/add-test`
 
@@ -262,17 +281,36 @@ See `TRANSFER_API_TEST_DATA.md` for complete testing guide! 🧪
 
 ### SOLUTION FOR STRIPE ERROR ✅
 
-**✅ VALIDATION ERROR FIXED!**
+**⚠️ IMPORTANT STRIPE LIMITATION DISCOVERED!**
 
-**Use the TEST endpoint to bypass Stripe validation during development:**
+**The TEST endpoint creates mock cards that CANNOT be used for real Stripe operations!**
 
-**WORKING TEST ENDPOINT:** `POST {{BASE_URL}}/api/payment-cards/add-test`
+**❌ LIMITATION:** Cards added via `/add-test` endpoint cannot be used for:
+- Creating payment intents (`/create-payment-intent`)
+- Processing money transfers (`/send-to-beneficiary`)
+- Any real Stripe operations
 
-This endpoint will work with your original card numbers without Stripe restrictions and validation errors!
+**✅ SOLUTIONS:**
 
-**🎯 RECOMMENDED FOR TESTING:**
-- Use `/api/payment-cards/add-test` for all development testing
-- Use `/api/payment-cards/add` for production with proper Stripe tokenization
+**Option 1: Use Real Stripe Test Cards (RECOMMENDED)**
+```
+POST {{BASE_URL}}/api/payment-cards/add
+```
+Use these official Stripe test payment methods that work with all operations:
+- **pm_card_visa** - Visa test card
+- **pm_card_mastercard** - MasterCard test card
+- **pm_card_amex** - American Express test card
+
+**Option 2: Development/UI Testing Only**
+```
+POST {{BASE_URL}}/api/payment-cards/add-test
+```
+Use only for testing card addition and listing (NOT for payments/transfers)
+
+**🎯 RECOMMENDED WORKFLOW:**
+- Use `/api/payment-cards/add-test` for UI/interface testing only
+- Use `/api/payment-cards/add` with Stripe test tokens for payment testing
+- Use real Stripe payment methods for transfer operations
 
 ## 🧪 STRIPE TEST CARD NUMBERS
 
@@ -403,6 +441,31 @@ Copy this into Postman as a collection:
           "raw": "{{BASE_URL}}/api/payment-cards/add",
           "host": ["{{BASE_URL}}"],
           "path": ["api", "payment-cards", "add"]
+        }
+      }
+    },
+    {
+      "name": "2A. Add Stripe Test Card (WORKS FOR TRANSFERS)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{AUTH_TOKEN}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"payment_method_id\": \"pm_card_visa\",\n  \"is_default\": true\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/api/payment-cards/add-stripe",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "payment-cards", "add-stripe"]
         }
       }
     },

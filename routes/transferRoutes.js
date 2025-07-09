@@ -11,5 +11,6 @@ router.post('/send-to-beneficiary', transferController.sendMoneyToBeneficiary);
 router.get('/history', transferController.getTransferHistory);
 router.get('/beneficiaries', transferController.getBeneficiariesList);
 router.get('/info', transferController.getTransferInfo);
+router.get('/debug', transferController.debugTransferData); // Debug transfer data
 
 module.exports = router;

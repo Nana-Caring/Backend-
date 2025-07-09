@@ -219,12 +219,24 @@ const sendMoneyToBeneficiary = async (req, res) => {
         // Rollback database transaction
         await dbTransaction.rollback();
         
+        console.error('Database transaction error details:', {
+          error: dbError.message,
+          stack: dbError.stack,
+          name: dbError.name,
+          sql: dbError.sql,
+          cardId,
+          beneficiaryId,
+          amount: transferAmount,
+          accountId: beneficiaryAccount.id
+        });
+        
         // Try to refund the Stripe payment if possible
         try {
           await stripe.refunds.create({
             payment_intent: paymentIntent.id,
             reason: 'requested_by_customer'
           });
+          console.log('Stripe payment refunded due to database error');
         } catch (refundError) {
           console.error('Refund failed:', refundError);
         }
@@ -236,7 +248,15 @@ const sendMoneyToBeneficiary = async (req, res) => {
       console.error('Database transaction error:', error);
       return res.status(500).json({
         message: 'Transfer failed',
-        error: 'Database error occurred during transfer'
+        error: 'Database error occurred during transfer',
+        details: error.message,
+        debug: {
+          cardId,
+          beneficiaryId,
+          amount: transferAmount,
+          hasAccount: !!beneficiaryAccount,
+          accountId: beneficiaryAccount?.id
+        }
       });
     }
 
@@ -445,9 +465,93 @@ const getTransferInfo = async (req, res) => {
   }
 };
 
+// Debug endpoint - check transfer prerequisites
+const debugTransferData = async (req, res) => {
+  try {
+    const { cardId, beneficiaryId } = req.query;
+    const funderId = req.user.id;
+
+    console.log('DEBUG: Checking transfer data for:', { cardId, beneficiaryId, funderId });
+
+    const debug = {};
+
+    // Check card
+    if (cardId) {
+      const card = await PaymentCard.findOne({
+        where: {
+          id: cardId,
+          userId: funderId,
+          isActive: true
+        }
+      });
+      debug.card = card ? {
+        id: card.id,
+        bankName: card.bankName,
+        isActive: card.isActive,
+        stripePaymentMethodId: card.stripePaymentMethodId
+      } : null;
+    }
+
+    // Check beneficiary
+    if (beneficiaryId) {
+      const beneficiary = await User.findOne({
+        where: {
+          id: beneficiaryId,
+          role: 'dependent'
+        }
+      });
+      debug.beneficiary = beneficiary ? {
+        id: beneficiary.id,
+        name: `${beneficiary.firstName} ${beneficiary.surname}`,
+        role: beneficiary.role
+      } : null;
+
+      // Check relationship
+      if (beneficiary) {
+        const { FunderDependent } = require('../models');
+        const relationship = await FunderDependent.findOne({
+          where: {
+            funderId: funderId,
+            dependentId: beneficiaryId
+          }
+        });
+        debug.relationship = !!relationship;
+
+        // Check account
+        const account = await Account.findOne({
+          where: {
+            userId: beneficiaryId,
+            status: 'active'
+          }
+        });
+        debug.account = account ? {
+          id: account.id,
+          accountNumber: account.accountNumber,
+          balance: account.balance,
+          status: account.status
+        } : null;
+      }
+    }
+
+    res.json({
+      message: 'Transfer debug data',
+      funderId,
+      debug
+    });
+
+  } catch (error) {
+    console.error('Debug transfer error:', error);
+    res.status(500).json({
+      message: 'Debug failed',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   sendMoneyToBeneficiary,
   getTransferHistory,
   getBeneficiariesList,
-  getTransferInfo
+  getTransferInfo,
+  debugTransferData
 };

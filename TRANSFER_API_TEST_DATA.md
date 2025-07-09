@@ -1,5 +1,37 @@
 # 💸 MONEY TRANSFER API - FUNDER TO BENEFICIARY
 
+## **🚨 CRITICAL STRIPE LIMITATION**
+
+**❌ IMPORTANT:** Cards added via the TEST endpoint (`/add-test`) cannot be used for real Stripe operations!
+
+**Error you'll get:**
+```
+"No such PaymentMethod: 'pm_test_...'"
+```
+
+**✅ SOLUTION: Use Real Stripe Test Payment Methods**
+
+Before testing transfers, add cards using the NEW STRIPE endpoint with official Stripe test payment methods:
+
+```bash
+POST {{BASE_URL}}/api/payment-cards/add-stripe
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+    "payment_method_id": "pm_card_visa",
+    "is_default": true
+}
+```
+
+**Available Stripe Test Payment Methods:**
+- `pm_card_visa` - Visa test card (✅ Works with all operations)
+- `pm_card_mastercard` - MasterCard test card
+- `pm_card_amex` - American Express test card
+- `pm_card_discover` - Discover test card
+
+---
+
 ## 🎯 Overview
 Enable funders to send money from their added payment cards directly to their beneficiaries' accounts.
 
