@@ -1,5 +1,55 @@
 # Credit/Debit Card Management System
 
+## **🚨 CRITICAL: Stripe Test vs Production Cards**
+
+### **Two Types of Card Addition:**
+
+**1. TEST Endpoint (Development UI Only)** ❌ Cannot be used for transfers
+```
+POST /api/payment-cards/add-test
+- Purpose: UI testing, card listing, interface development
+- Limitation: Creates mock cards that CANNOT be used with Stripe operations
+- Error: "No such PaymentMethod: 'pm_test_...'" when used for transfers
+```
+
+**2. PRODUCTION Endpoint (Required for Transfers)** ✅ Works with all operations
+```
+POST /api/payment-cards/add  
+- Purpose: Real card addition with Stripe integration
+- Requirement: Use official Stripe test payment methods
+- Works with: All operations including transfers and payments
+```
+
+### **✅ RECOMMENDED WORKFLOW:**
+
+**For Development/UI Testing:**
+```bash
+# Use test endpoint for UI development
+POST /api/payment-cards/add-test
+# Body: card details (numbers, expiry, etc.)
+```
+
+**For Payment/Transfer Testing:**
+```bash
+# Use production endpoint with Stripe test payment methods
+POST /api/payment-cards/add
+# Body: { "payment_method_id": "pm_card_visa", "user_id": 1 }
+```
+
+**Official Stripe Test Payment Methods:**
+- `pm_card_visa` - Visa test card
+- `pm_card_mastercard` - MasterCard test card  
+- `pm_card_amex` - American Express test card
+- `pm_card_discover` - Discover test card
+
+### **🔧 Quick Setup Script:**
+Run this script to add working test cards:
+```bash
+node add-stripe-test-cards.js
+```
+
+---
+
 ## Overview
 This system allows funders to add and manage credit/debit cards as payment methods. The implementation focuses exclusively on card payments with secure handling through Stripe integration.
 

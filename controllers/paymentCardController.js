@@ -354,6 +354,43 @@ const deletePaymentCard = async (req, res) => {
   }
 };
 
+// Delete all cards for user (cleanup endpoint)
+const deleteAllCards = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Get all cards for this user
+    const allCards = await PaymentCard.findAll({
+      where: { userId }
+    });
+
+    if (allCards.length === 0) {
+      return res.json({
+        message: 'No cards found to delete',
+        deletedCount: 0
+      });
+    }
+
+    // Delete all cards
+    const deletedCount = await PaymentCard.destroy({
+      where: { userId }
+    });
+
+    res.json({
+      message: `All cards deleted successfully`,
+      deletedCount: deletedCount,
+      cardIds: allCards.map(card => card.id)
+    });
+
+  } catch (error) {
+    console.error('Delete all cards error:', error);
+    res.status(500).json({
+      message: 'Failed to delete cards',
+      error: error.message
+    });
+  }
+};
+
 // Create payment intent with selected card
 const createPaymentIntentWithCard = async (req, res) => {
   try {
@@ -539,11 +576,272 @@ const addPaymentCardTest = async (req, res) => {
   }
 };
 
+// Add a payment card using Stripe Payment Method ID (for production/testing)
+const addPaymentCardWithStripeMethod = async (req, res) => {
+  try {
+    const { payment_method_id, user_id, is_default = false } = req.body;
+    const userId = req.user.id;
+
+    // Validate required fields
+    if (!payment_method_id) {
+      return res.status(400).json({
+        message: 'Stripe payment method ID is required',
+        example: {
+          payment_method_id: 'pm_card_visa',
+          user_id: userId,
+          is_default: true
+        }
+      });
+    }
+
+    // Get user for Stripe customer creation
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Create or get Stripe customer
+    let stripeCustomerId;
+    try {
+      stripeCustomerId = await createStripeCustomer(user);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed to set up payment processing',
+        error: error.message
+      });
+    }
+
+    // Retrieve payment method from Stripe to get card details
+    let paymentMethod;
+    try {
+      paymentMethod = await stripe.paymentMethods.retrieve(payment_method_id);
+      
+      // Attach payment method to customer
+      await stripe.paymentMethods.attach(payment_method_id, {
+        customer: stripeCustomerId,
+      });
+
+    } catch (stripeError) {
+      console.error('Stripe payment method error:', stripeError);
+      return res.status(400).json({
+        message: 'Invalid payment method ID',
+        error: stripeError.message,
+        availableTestMethods: [
+          'pm_card_visa',
+          'pm_card_mastercard', 
+          'pm_card_amex',
+          'pm_card_discover'
+        ]
+      });
+    }
+
+    // Extract card information from Stripe
+    const card = paymentMethod.card;
+    const bankName = `${card.brand.charAt(0).toUpperCase() + card.brand.slice(1)} Card`;
+    const last4 = card.last4;
+    const expiryMonth = card.exp_month.toString().padStart(2, '0');
+    const expiryYear = card.exp_year.toString().slice(-2);
+
+    // Check if card already exists for this user
+    const existingCard = await PaymentCard.findOne({
+      where: {
+        userId,
+        cardNumber: { [require('sequelize').Op.like]: `%${last4}` }
+      }
+    });
+
+    if (existingCard) {
+      return res.status(400).json({
+        message: `A ${card.brand} card ending in ${last4} is already added to your account`
+      });
+    }
+
+    // If this is set as default, unset other defaults
+    if (is_default) {
+      await PaymentCard.update(
+        { isDefault: false },
+        { where: { userId, isDefault: true } }
+      );
+    }
+
+    // Create payment card record
+    const paymentCard = await PaymentCard.create({
+      userId,
+      bankName,
+      cardNumber: last4, // Store only last 4 digits
+      expiryDate: `${expiryMonth}/${expiryYear}`,
+      ccv: '000', // Numeric placeholder since we don't have access to real CCV with Stripe payment methods
+      nickname: `${bankName} ending in ${last4}`,
+      isDefault: is_default,
+      isActive: true,
+      stripePaymentMethodId: payment_method_id,
+      stripeCustomerId: stripeCustomerId
+    });
+
+    // Return success response
+    res.status(201).json({
+      message: 'Payment card added successfully with Stripe integration',
+      card: {
+        id: paymentCard.id,
+        bankName: paymentCard.bankName,
+        cardNumber: `****-****-****-${last4}`, // Format for display
+        expiryDate: paymentCard.expiryDate,
+        nickname: paymentCard.nickname,
+        isDefault: paymentCard.isDefault,
+        isActive: paymentCard.isActive,
+        brand: card.brand,
+        last_four: last4,
+        createdAt: paymentCard.createdAt
+      },
+      stripe: {
+        payment_method_id: payment_method_id,
+        customer_id: stripeCustomerId,
+        ready_for_transfers: true
+      }
+    });
+
+  } catch (error) {
+    console.error('Error adding payment card with Stripe method:', error);
+    
+    // Handle table missing error
+    if (error.message && error.message.includes('relation "payment_cards" does not exist')) {
+      return res.status(500).json({
+        message: 'Payment cards table not found',
+        error: 'Database table missing - run migrations or setup scripts',
+        solutions: [
+          'Run: npx sequelize-cli db:migrate',
+          'Run: node setup-production-payment-cards.js',
+          'Check database connection'
+        ]
+      });
+    }
+
+    res.status(500).json({
+      message: 'Failed to add payment card',
+      error: error.message
+    });
+  }
+};
+
+// Debug endpoint - get all cards including inactive (for troubleshooting)
+const getAllCardsDebug = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    console.log('DEBUG: Fetching cards for user ID:', userId);
+
+    // Get ALL cards for this user (including inactive)
+    const allCards = await PaymentCard.findAll({
+      where: {
+        userId
+      },
+      order: [['createdAt', 'DESC']]
+    });
+
+    console.log('DEBUG: Found', allCards.length, 'total cards');
+
+    // Get active cards only
+    const activeCards = await PaymentCard.findAll({
+      where: {
+        userId,
+        isActive: true
+      },
+      order: [['createdAt', 'DESC']]
+    });
+
+    console.log('DEBUG: Found', activeCards.length, 'active cards');
+
+    const debugInfo = {
+      userId: userId,
+      totalCardsInDB: allCards.length,
+      activeCards: activeCards.length,
+      allCards: allCards.map(card => ({
+        id: card.id,
+        bankName: card.bankName,
+        cardNumber: maskCardNumber(card.cardNumber),
+        isActive: card.isActive,
+        isDefault: card.isDefault,
+        stripePaymentMethodId: card.stripePaymentMethodId,
+        createdAt: card.createdAt
+      })),
+      activeCardsOnly: activeCards.map(card => ({
+        id: card.id,
+        bankName: card.bankName,
+        cardNumber: maskCardNumber(card.cardNumber),
+        isDefault: card.isDefault,
+        createdAt: card.createdAt
+      }))
+    };
+
+    res.json({
+      message: 'Debug info retrieved',
+      debug: debugInfo
+    });
+
+  } catch (error) {
+    console.error('Debug cards error:', error);
+    res.status(500).json({
+      message: 'Debug failed',
+      error: error.message,
+      userId: req.user.id
+    });
+  }
+};
+
+// Reactivate an inactive card
+const reactivateCard = async (req, res) => {
+  try {
+    const { cardId } = req.params;
+    const userId = req.user.id;
+
+    // Find the card
+    const card = await PaymentCard.findOne({
+      where: {
+        id: cardId,
+        userId: userId
+      }
+    });
+
+    if (!card) {
+      return res.status(404).json({
+        message: 'Card not found'
+      });
+    }
+
+    // Reactivate the card
+    await card.update({
+      isActive: true
+    });
+
+    res.json({
+      message: 'Card reactivated successfully',
+      card: {
+        id: card.id,
+        bankName: card.bankName,
+        cardNumber: maskCardNumber(card.cardNumber),
+        isActive: card.isActive,
+        isDefault: card.isDefault
+      }
+    });
+
+  } catch (error) {
+    console.error('Reactivate card error:', error);
+    res.status(500).json({
+      message: 'Failed to reactivate card',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   addPaymentCard,
   getPaymentCards,
   setDefaultCard,
   deletePaymentCard,
+  deleteAllCards,
   createPaymentIntentWithCard,
-  addPaymentCardTest
+  addPaymentCardTest,
+  addPaymentCardWithStripeMethod,
+  getAllCardsDebug,
+  reactivateCard
 };

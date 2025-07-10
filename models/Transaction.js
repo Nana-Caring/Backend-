@@ -1,12 +1,12 @@
 module.exports = (sequelize, DataTypes) => {
     const Transaction = sequelize.define('Transaction', {
         id: {
-            type: DataTypes.INTEGER,
-            autoIncrement: true,
+            type: DataTypes.UUID,
+            defaultValue: DataTypes.UUIDV4,
             primaryKey: true
         },
         accountId: {
-            type: DataTypes.INTEGER,
+            type: DataTypes.UUID,
             allowNull: false,
             references: {
                 model: 'Accounts',
@@ -20,6 +20,19 @@ module.exports = (sequelize, DataTypes) => {
         type: {
             type: DataTypes.ENUM('Debit', 'Credit'),
             allowNull: false
+        },
+        description: {
+            type: DataTypes.STRING,
+            allowNull: true
+        },
+        reference: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            unique: true
+        },
+        metadata: {
+            type: DataTypes.JSON,
+            allowNull: true
         },
         timestamp: {
             type: DataTypes.DATE,
