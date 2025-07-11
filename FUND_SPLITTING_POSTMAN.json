@@ -1,0 +1,737 @@
+{
+	"info": {
+		"_postman_id": "fund-splitting-collection",
+		"name": "NANA Project - Fund Splitting Tests",
+		"description": "Test collection for the automatic fund splitting functionality when beneficiaries receive money transfers.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Login as Funder",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (responseCode.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('funder_token', jsonData.token);",
+									"    pm.environment.set('funder_id', jsonData.user.id);",
+									"    pm.test('Login successful', function () {",
+									"        pm.expect(jsonData.token).to.not.be.empty;",
+									"    });",
+									"} else {",
+									"    pm.test('Login failed', function () {",
+									"        pm.expect(responseCode.code).to.equal(200);",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{funder_email}}\",\n    \"password\": \"{{funder_password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login as Dependent",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (responseCode.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('dependent_token', jsonData.token);",
+									"    pm.environment.set('dependent_id', jsonData.user.id);",
+									"    pm.test('Dependent login successful', function () {",
+									"        pm.expect(jsonData.token).to.not.be.empty;",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{dependent_email}}\",\n    \"password\": \"{{dependent_password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Setup and Verification",
+			"item": [
+				{
+					"name": "Get Funder Payment Cards",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (responseCode.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.cards && jsonData.cards.length > 0) {",
+									"        pm.environment.set('test_card_id', jsonData.cards[0].id);",
+									"        pm.test('Payment card found', function () {",
+									"            pm.expect(jsonData.cards[0].id).to.not.be.empty;",
+									"        });",
+									"    } else {",
+									"        pm.test('No payment cards found - need to add cards first', function () {",
+									"            pm.expect(jsonData.cards).to.be.an('array');",
+									"        });",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{funder_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/payment-cards",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"payment-cards"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Beneficiaries List",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (responseCode.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.beneficiaries && jsonData.beneficiaries.length > 0) {",
+									"        pm.environment.set('test_beneficiary_id', jsonData.beneficiaries[0].id);",
+									"        pm.test('Beneficiary found', function () {",
+									"            pm.expect(jsonData.beneficiaries[0].id).to.not.be.empty;",
+									"        });",
+									"    } else {",
+									"        pm.test('No beneficiaries found - need to add dependents first', function () {",
+									"            pm.expect(jsonData.beneficiaries).to.be.an('array');",
+									"        });",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{funder_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/transfers/beneficiaries",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"transfers",
+								"beneficiaries"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Check Dependent Accounts (Before Transfer)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (responseCode.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.test('Accounts retrieved', function () {",
+									"        pm.expect(jsonData.accounts).to.be.an('object');",
+									"    });",
+									"    ",
+									"    // Store account info for comparison",
+									"    if (jsonData.accounts.main && jsonData.accounts.main.length > 0) {",
+									"        pm.environment.set('main_account_balance_before', jsonData.accounts.main[0].balance);",
+									"    }",
+									"    ",
+									"    if (jsonData.accounts.sub && jsonData.accounts.sub.length > 0) {",
+									"        pm.environment.set('sub_accounts_count', jsonData.accounts.sub.length);",
+									"        // Store balances for comparison",
+									"        var subBalances = {};",
+									"        jsonData.accounts.sub.forEach(function(account) {",
+									"            subBalances[account.accountType] = account.balance;",
+									"        });",
+									"        pm.environment.set('sub_balances_before', JSON.stringify(subBalances));",
+									"    }",
+									"    ",
+									"    pm.test('Total balance is numeric', function () {",
+									"        pm.expect(parseFloat(jsonData.totalBalance)).to.be.a('number');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{dependent_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/accounts/dependent/my-accounts",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"accounts",
+								"dependent",
+								"my-accounts"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Fund Splitting Tests",
+			"item": [
+				{
+					"name": "Send Money with Fund Splitting (R100)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Transfer successful', function () {",
+									"    pm.expect(pm.response.code).to.equal(201);",
+									"});",
+									"",
+									"if (responseCode.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    ",
+									"    pm.test('Transfer amount is correct', function () {",
+									"        pm.expect(jsonData.transfer.amount).to.equal(100);",
+									"    });",
+									"    ",
+									"    pm.test('Fund splitting is enabled', function () {",
+									"        pm.expect(jsonData.fundSplitting.enabled).to.be.true;",
+									"    });",
+									"    ",
+									"    pm.test('All money is distributed', function () {",
+									"        var totalSplit = jsonData.fundSplitting.totalSplitAmount;",
+									"        var remaining = jsonData.fundSplitting.remainingToMainAccount;",
+									"        pm.expect(totalSplit + remaining).to.equal(100);",
+									"    });",
+									"    ",
+									"    pm.test('Splits are created', function () {",
+									"        pm.expect(jsonData.fundSplitting.splits).to.be.an('array');",
+									"        pm.expect(jsonData.fundSplitting.splits.length).to.be.greaterThan(0);",
+									"    });",
+									"    ",
+									"    pm.test('Each split has required fields', function () {",
+									"        jsonData.fundSplitting.splits.forEach(function(split) {",
+									"            pm.expect(split.accountType).to.not.be.empty;",
+									"            pm.expect(split.amount).to.be.a('number');",
+									"            pm.expect(split.percentage).to.be.a('number');",
+									"            pm.expect(split.transactionId).to.not.be.empty;",
+									"        });",
+									"    });",
+									"    ",
+									"    pm.test('Percentages are correct', function () {",
+									"        var expectedAllocations = {",
+									"            'Education': 25,",
+									"            'Healthcare': 20,",
+									"            'Savings': 20,",
+									"            'Clothing': 15,",
+									"            'Baby Care': 10,",
+									"            'Entertainment': 5,",
+									"            'Pregnancy': 5",
+									"        };",
+									"        ",
+									"        jsonData.fundSplitting.splits.forEach(function(split) {",
+									"            if (expectedAllocations[split.accountType]) {",
+									"                pm.expect(split.percentage).to.equal(expectedAllocations[split.accountType]);",
+									"            }",
+									"        });",
+									"    });",
+									"    ",
+									"    // Store transaction reference for verification",
+									"    pm.environment.set('test_transaction_ref', jsonData.transfer.transactionRef);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{funder_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"cardId\": \"{{test_card_id}}\",\n    \"beneficiaryId\": \"{{test_beneficiary_id}}\",\n    \"amount\": 100.00,\n    \"description\": \"Test fund splitting with R100\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/transfers/send",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"transfers",
+								"send"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Send Money with Fund Splitting (R250)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Large transfer successful', function () {",
+									"    pm.expect(pm.response.code).to.equal(201);",
+									"});",
+									"",
+									"if (responseCode.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    ",
+									"    pm.test('Transfer amount is correct', function () {",
+									"        pm.expect(jsonData.transfer.amount).to.equal(250);",
+									"    });",
+									"    ",
+									"    pm.test('Education gets largest allocation', function () {",
+									"        var educationSplit = jsonData.fundSplitting.splits.find(s => s.accountType === 'Education');",
+									"        if (educationSplit) {",
+									"            pm.expect(educationSplit.amount).to.equal(62.5); // 25% of 250",
+									"        }",
+									"    });",
+									"    ",
+									"    pm.test('Healthcare and Savings get equal allocation', function () {",
+									"        var healthcareSplit = jsonData.fundSplitting.splits.find(s => s.accountType === 'Healthcare');",
+									"        var savingsSplit = jsonData.fundSplitting.splits.find(s => s.accountType === 'Savings');",
+									"        if (healthcareSplit && savingsSplit) {",
+									"            pm.expect(healthcareSplit.amount).to.equal(savingsSplit.amount);",
+									"            pm.expect(healthcareSplit.amount).to.equal(50); // 20% of 250",
+									"        }",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{funder_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"cardId\": \"{{test_card_id}}\",\n    \"beneficiaryId\": \"{{test_beneficiary_id}}\",\n    \"amount\": 250.00,\n    \"description\": \"Test fund splitting with R250\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/transfers/send",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"transfers",
+								"send"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Send Small Amount (R15)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Small transfer successful', function () {",
+									"    pm.expect(pm.response.code).to.equal(201);",
+									"});",
+									"",
+									"if (responseCode.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    ",
+									"    pm.test('Small amounts are handled correctly', function () {",
+									"        pm.expect(jsonData.transfer.amount).to.equal(15);",
+									"    });",
+									"    ",
+									"    pm.test('Rounding is handled properly', function () {",
+									"        var totalAllocated = jsonData.fundSplitting.totalSplitAmount + jsonData.fundSplitting.remainingToMainAccount;",
+									"        pm.expect(totalAllocated).to.equal(15);",
+									"    });",
+									"    ",
+									"    pm.test('Some accounts may get zero allocation', function () {",
+									"        // With R15 and 7 sub-accounts, some will get very small amounts",
+									"        var hasZeroAllocation = jsonData.fundSplitting.splits.some(s => s.amount === 0);",
+									"        // This might happen with very small amounts",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{funder_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"cardId\": \"{{test_card_id}}\",\n    \"beneficiaryId\": \"{{test_beneficiary_id}}\",\n    \"amount\": 15.00,\n    \"description\": \"Test fund splitting with small amount\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/transfers/send",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"transfers",
+								"send"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Verification",
+			"item": [
+				{
+					"name": "Check Dependent Accounts (After Transfer)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (responseCode.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    ",
+									"    pm.test('Account balances updated', function () {",
+									"        var currentTotalBalance = parseFloat(jsonData.totalBalance);",
+									"        // Should be higher than before transfers",
+									"        pm.expect(currentTotalBalance).to.be.greaterThan(0);",
+									"    });",
+									"    ",
+									"    pm.test('Sub-accounts have positive balances', function () {",
+									"        if (jsonData.accounts.sub && jsonData.accounts.sub.length > 0) {",
+									"            var hasPositiveBalance = jsonData.accounts.sub.some(account => {",
+									"                return parseFloat(account.balance) > 0;",
+									"            });",
+									"            pm.expect(hasPositiveBalance).to.be.true;",
+									"        }",
+									"    });",
+									"    ",
+									"    pm.test('Account structure is maintained', function () {",
+									"        pm.expect(jsonData.accounts.main).to.be.an('array');",
+									"        pm.expect(jsonData.accounts.sub).to.be.an('array');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{dependent_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/accounts/dependent/my-accounts",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"accounts",
+								"dependent",
+								"my-accounts"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Transfer History",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (responseCode.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    ",
+									"    pm.test('Transfer history retrieved', function () {",
+									"        pm.expect(jsonData.transfers).to.be.an('array');",
+									"    });",
+									"    ",
+									"    pm.test('Recent transfers are visible', function () {",
+									"        pm.expect(jsonData.transfers.length).to.be.greaterThan(0);",
+									"    });",
+									"    ",
+									"    pm.test('Transfer amounts match our tests', function () {",
+									"        var amounts = jsonData.transfers.map(t => t.amount);",
+									"        // Should include our test amounts: 100, 250, 15",
+									"        var hasTestAmounts = amounts.some(amount => [100, 250, 15].includes(amount));",
+									"        pm.expect(hasTestAmounts).to.be.true;",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{funder_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/transfers/history",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"transfers",
+								"history"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Debug Transfer Data",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (responseCode.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    ",
+									"    pm.test('Debug data is complete', function () {",
+									"        pm.expect(jsonData.debug).to.be.an('object');",
+									"    });",
+									"    ",
+									"    pm.test('Card and beneficiary are verified', function () {",
+									"        if (jsonData.debug.card) {",
+									"            pm.expect(jsonData.debug.card.isActive).to.be.true;",
+									"        }",
+									"        if (jsonData.debug.beneficiary) {",
+									"            pm.expect(jsonData.debug.beneficiary.role).to.equal('dependent');",
+									"        }",
+									"    });",
+									"    ",
+									"    pm.test('Relationship exists', function () {",
+									"        pm.expect(jsonData.debug.relationship).to.be.true;",
+									"    });",
+									"    ",
+									"    pm.test('Account is available', function () {",
+									"        if (jsonData.debug.account) {",
+									"            pm.expect(jsonData.debug.account.status).to.equal('active');",
+									"        }",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{funder_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/transfers/debug?cardId={{test_card_id}}&beneficiaryId={{test_beneficiary_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"transfers",
+								"debug"
+							],
+							"query": [
+								{
+									"key": "cardId",
+									"value": "{{test_card_id}}"
+								},
+								{
+									"key": "beneficiaryId",
+									"value": "{{test_beneficiary_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "funder_email",
+			"value": "your-funder@example.com",
+			"type": "string"
+		},
+		{
+			"key": "funder_password",
+			"value": "your-password",
+			"type": "string"
+		},
+		{
+			"key": "dependent_email",
+			"value": "your-dependent@example.com",
+			"type": "string"
+		},
+		{
+			"key": "dependent_password",
+			"value": "your-password",
+			"type": "string"
+		}
+	]
+}

@@ -14,6 +14,142 @@ function generateTransactionRef() {
   return `TXN${timestamp.slice(-6)}${random}`;
 }
 
+// Default allocation percentages for sub-accounts
+const DEFAULT_SUB_ACCOUNT_ALLOCATIONS = {
+  'Education': 25,      // 25%
+  'Healthcare': 20,     // 20%
+  'Savings': 20,        // 20%
+  'Clothing': 15,       // 15%
+  'Baby Care': 10,      // 10%
+  'Entertainment': 5,   // 5%
+  'Pregnancy': 5        // 5%
+  // Total: 100%
+};
+
+// Helper function to split funds among sub-accounts
+async function splitFundsAmongSubAccounts(mainAccountId, totalAmount, transactionRef, description, dbTransaction) {
+  try {
+    // Get all sub-accounts for this main account
+    const subAccounts = await Account.findAll({
+      where: {
+        parentAccountId: mainAccountId,
+        status: 'active'
+      },
+      order: [['accountType', 'ASC']],
+      transaction: dbTransaction
+    });
+
+    if (subAccounts.length === 0) {
+      // No sub-accounts, all money goes to main account
+      return {
+        splits: [],
+        totalSplitAmount: 0,
+        remainingAmount: totalAmount,
+        message: 'No sub-accounts found, all funds allocated to main account'
+      };
+    }
+
+    const splits = [];
+    let totalSplitAmount = 0;
+    let remainingToDistribute = totalAmount;
+
+    // Calculate allocations based on account types
+    const allocations = [];
+    let totalPercentage = 0;
+
+    for (const subAccount of subAccounts) {
+      const percentage = DEFAULT_SUB_ACCOUNT_ALLOCATIONS[subAccount.accountType] || 0;
+      totalPercentage += percentage;
+      allocations.push({
+        account: subAccount,
+        percentage: percentage
+      });
+    }
+
+    // If total percentage is less than 100%, adjust proportionally
+    if (totalPercentage > 0 && totalPercentage < 100) {
+      const adjustmentFactor = 100 / totalPercentage;
+      allocations.forEach(allocation => {
+        allocation.percentage *= adjustmentFactor;
+      });
+      totalPercentage = 100;
+    }
+
+    // If no allocations are defined for any account type, use equal split
+    if (totalPercentage === 0) {
+      const equalPercentage = 100 / subAccounts.length;
+      allocations.forEach(allocation => {
+        allocation.percentage = equalPercentage;
+      });
+      totalPercentage = 100;
+    }
+
+    // Calculate actual amounts (handle rounding by giving remainder to first account)
+    for (let i = 0; i < allocations.length; i++) {
+      const allocation = allocations[i];
+      let amount;
+      
+      if (i === allocations.length - 1) {
+        // Last account gets remaining amount to handle rounding
+        amount = remainingToDistribute;
+      } else {
+        amount = Math.floor((totalAmount * allocation.percentage / 100) * 100) / 100; // Round to 2 decimal places
+        remainingToDistribute -= amount;
+      }
+
+      if (amount > 0) {
+        // Create transaction for this sub-account
+        const splitTransaction = await Transaction.create({
+          accountId: allocation.account.id,
+          amount: amount,
+          type: 'Credit',
+          description: `${description} (${allocation.percentage.toFixed(1)}% split)`,
+          reference: `${transactionRef}-SUB-${allocation.account.accountType.toUpperCase()}`,
+          metadata: {
+            splitFrom: mainAccountId,
+            splitPercentage: allocation.percentage,
+            originalTransactionRef: transactionRef,
+            splitType: 'automatic_allocation'
+          }
+        }, { transaction: dbTransaction });
+
+        // Update sub-account balance
+        await allocation.account.increment('balance', {
+          by: amount,
+          transaction: dbTransaction
+        });
+
+        // Update last transaction date
+        await allocation.account.update({
+          lastTransactionDate: new Date()
+        }, { transaction: dbTransaction });
+
+        splits.push({
+          accountId: allocation.account.id,
+          accountType: allocation.account.accountType,
+          accountNumber: allocation.account.accountNumber,
+          amount: amount,
+          percentage: allocation.percentage,
+          transactionId: splitTransaction.id
+        });
+
+        totalSplitAmount += amount;
+      }
+    }
+
+    return {
+      splits: splits,
+      totalSplitAmount: totalSplitAmount,
+      remainingAmount: totalAmount - totalSplitAmount,
+      message: `Funds split among ${splits.length} sub-accounts`
+    };
+
+  } catch (error) {
+    console.error('Error splitting funds among sub-accounts:', error);
+    throw new Error(`Fund splitting failed: ${error.message}`);
+  }
+}
+
 // Send money from funder's card to beneficiary account
 const sendMoneyToBeneficiary = async (req, res) => {
   try {
@@ -159,7 +295,7 @@ const sendMoneyToBeneficiary = async (req, res) => {
       const dbTransaction = await require('../config/database').transaction();
 
       try {
-        // Create credit transaction for beneficiary
+        // Create credit transaction for beneficiary main account
         const creditTransaction = await Transaction.create({
           accountId: beneficiaryAccount.id,
           amount: transferAmount,
@@ -174,9 +310,18 @@ const sendMoneyToBeneficiary = async (req, res) => {
           }
         }, { transaction: dbTransaction });
 
-        // Update beneficiary account balance
+        // Split the funds among sub-accounts
+        const splitResult = await splitFundsAmongSubAccounts(
+          beneficiaryAccount.id,
+          transferAmount,
+          transactionRef,
+          `Split from transfer: ${funder.firstName} ${funder.surname}`,
+          dbTransaction
+        );
+
+        // Update beneficiary main account balance (receives the remaining amount after splits)
         await beneficiaryAccount.increment('balance', {
-          by: transferAmount,
+          by: splitResult.remainingAmount,
           transaction: dbTransaction
         });
 
@@ -208,8 +353,16 @@ const sendMoneyToBeneficiary = async (req, res) => {
             timestamp: new Date(),
             description: description || `Transfer to ${beneficiary.firstName} ${beneficiary.surname}`
           },
+          fundSplitting: {
+            enabled: splitResult.splits.length > 0,
+            totalSplitAmount: splitResult.totalSplitAmount,
+            remainingToMainAccount: splitResult.remainingAmount,
+            splits: splitResult.splits,
+            message: splitResult.message
+          },
           balanceUpdate: {
-            beneficiaryNewBalance: parseFloat(beneficiaryAccount.balance) + transferAmount
+            beneficiaryNewBalance: parseFloat(beneficiaryAccount.balance) + splitResult.remainingAmount,
+            totalDistributed: transferAmount
           }
         };
 
@@ -553,5 +706,6 @@ module.exports = {
   getTransferHistory,
   getBeneficiariesList,
   getTransferInfo,
-  debugTransferData
+  debugTransferData,
+  splitFundsAmongSubAccounts // Export for testing and reuse
 };

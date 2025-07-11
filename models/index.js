@@ -41,6 +41,28 @@ Account.belongsTo(User, {
     as: 'user'
 });
 
+// Account self-referencing associations for parent/sub accounts
+Account.belongsTo(Account, {
+    foreignKey: 'parentAccountId',
+    as: 'parentAccount'
+});
+
+Account.hasMany(Account, {
+    foreignKey: 'parentAccountId',
+    as: 'subAccounts'
+});
+
+// Account caregiver association
+Account.belongsTo(User, {
+    foreignKey: 'caregiverId',
+    as: 'caregiver'
+});
+
+User.hasMany(Account, {
+    foreignKey: 'caregiverId',
+    as: 'caregiverAccounts'
+});
+
 // PaymentCard associations
 User.hasMany(PaymentCard, {
     foreignKey: 'userId',
@@ -67,6 +89,21 @@ models.FunderDependent.belongsTo(models.User, {
 models.User.hasMany(models.FunderDependent, {
   foreignKey: 'funderId',
   as: 'linkedDependents'
+});
+
+// Caregiver-Dependent associations (through caregiverId in accounts)
+models.User.belongsToMany(models.User, {
+  through: models.Account,
+  foreignKey: 'caregiverId',
+  otherKey: 'userId',
+  as: 'Dependents'
+});
+
+models.User.belongsToMany(models.User, {
+  through: models.Account,
+  foreignKey: 'userId',
+  otherKey: 'caregiverId',
+  as: 'Caregivers'
 });
 
 // Transaction associations
