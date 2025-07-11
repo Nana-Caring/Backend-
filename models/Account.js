@@ -49,6 +49,14 @@ Account.init({
   parentAccountId: {
     type: DataTypes.UUID,
     allowNull: true,
+  },
+  caregiverId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
   }
 }, {
   sequelize,
@@ -63,6 +71,12 @@ Account.associate = function(models) {
   Account.belongsTo(models.User, {
     foreignKey: 'userId',
     as: 'user'
+  });
+  
+  // Account belongs to a Caregiver (User with caregiver role)
+  Account.belongsTo(models.User, {
+    foreignKey: 'caregiverId',
+    as: 'caregiver'
   });
   
   // Account has many Transactions

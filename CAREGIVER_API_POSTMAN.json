@@ -1,0 +1,514 @@
+{
+  "info": {
+    "_postman_id": "caregiver-api-collection",
+    "name": "Caregiver API Collection",
+    "description": "Complete collection for testing caregiver endpoints to fetch and manage dependents",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{caregiverToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "// Set base URL if not already set",
+          "if (!pm.environment.get('baseUrl')) {",
+          "    pm.environment.set('baseUrl', 'http://localhost:5000');",
+          "}"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "caregiverToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "dependentId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Caregiver Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('caregiverToken', response.token);",
+                  "    pm.environment.set('caregiverId', response.user.id);",
+                  "    console.log('Caregiver token set successfully');",
+                  "    console.log('Caregiver ID:', response.user.id);",
+                  "    console.log('Role:', response.user.role);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"caregiver@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dependent Management",
+      "item": [
+        {
+          "name": "Get All Dependents (Basic)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.data.dependents && response.data.dependents.length > 0) {",
+                  "        pm.environment.set('dependentId', response.data.dependents[0].id);",
+                  "        console.log('First dependent ID saved:', response.data.dependents[0].id);",
+                  "        console.log('Total dependents:', response.data.pagination.totalDependents);",
+                  "    }",
+                  "}",
+                  "",
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success field', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{caregiverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/caregiver/dependents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "caregiver", "dependents"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Dependents with Pagination",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{caregiverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/caregiver/dependents?page=1&limit=5&sortBy=firstName&sortOrder=ASC",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "caregiver", "dependents"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "firstName"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "ASC"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Search Dependents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{caregiverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/caregiver/dependents?search=john&status=active",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "caregiver", "dependents"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "john"
+                },
+                {
+                  "key": "status",
+                  "value": "active"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Dependents (All Statuses)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{caregiverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/caregiver/dependents?status=all&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "caregiver", "dependents"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "all"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Specific Dependent Details",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains dependent details', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('fullName');",
+                  "    pm.expect(jsonData.data).to.have.property('account');",
+                  "    pm.expect(jsonData.data.account).to.have.property('balance');",
+                  "    pm.expect(jsonData.data.account).to.have.property('statistics');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{caregiverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/caregiver/dependents/{{dependentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "caregiver", "dependents", "{{dependentId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dashboard & Statistics",
+      "item": [
+        {
+          "name": "Get Caregiver Dashboard Stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains statistics', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('totalDependents');",
+                  "    pm.expect(jsonData.data).to.have.property('dependentsByStatus');",
+                  "    pm.expect(jsonData.data).to.have.property('totalAccountBalance');",
+                  "    pm.expect(jsonData.data).to.have.property('recentTransactionsCount');",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    console.log('Total Dependents:', response.data.totalDependents);",
+                  "    console.log('Total Balance: R', response.data.totalAccountBalance);",
+                  "    console.log('Recent Transactions:', response.data.recentTransactionsCount);",
+                  "    console.log('Status Breakdown:', JSON.stringify(response.data.dependentsByStatus, null, 2));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{caregiverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/caregiver/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "caregiver", "stats"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Recent Activity (7 days)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{caregiverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/caregiver/activity?limit=10&days=7",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "caregiver", "activity"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "days",
+                  "value": "7"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Extended Activity (30 days)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{caregiverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/caregiver/activity?limit=50&days=30",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "caregiver", "activity"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "days",
+                  "value": "30"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Error Testing",
+      "item": [
+        {
+          "name": "Get Dependents without Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Response indicates unauthorized', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/caregiver/dependents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "caregiver", "dependents"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Non-existent Dependent",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('Response indicates not found', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.include('not found');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{caregiverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/caregiver/dependents/99999",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "caregiver", "dependents", "99999"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Test Scenarios",
+      "item": [
+        {
+          "name": "Complete Workflow Test",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// This runs the complete caregiver workflow",
+                  "console.log('Starting complete caregiver workflow test...');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Test the complete workflow",
+                  "pm.test('Workflow: Login -> Stats -> Dependents -> Details', function () {",
+                  "    // This would be run as part of a collection runner",
+                  "    pm.expect(pm.environment.get('caregiverToken')).to.not.be.empty;",
+                  "    pm.expect(pm.environment.get('dependentId')).to.not.be.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{caregiverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/caregiver/dependents?limit=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "caregiver", "dependents"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

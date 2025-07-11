@@ -9,6 +9,16 @@ const {
   suspendUser, 
   getBlockedUsers 
 } = require('../controllers/userController');
+const {
+  getAllTransactions,
+  getTransactionById,
+  createManualTransaction,
+  updateTransaction,
+  reverseTransaction,
+  deleteTransaction,
+  getTransactionStats,
+  bulkOperations
+} = require('../controllers/adminTransactionController');
 
 // Get all users
 router.get('/users', authenticate, isAdmin, async (req, res) => {
@@ -22,8 +32,40 @@ router.get('/accounts', authenticate, isAdmin, async (req, res) => {
   res.json(accounts);
 });
 
-// Get all transactions
-router.get('/transactions', authenticate, isAdmin, async (req, res) => {
+// ========================================
+// TRANSACTION MANAGEMENT ROUTES
+// ========================================
+
+// Get all transactions with advanced filtering
+router.get('/transactions', authenticate, isAdmin, getAllTransactions);
+
+// Get transaction statistics
+router.get('/transactions/stats', authenticate, isAdmin, getTransactionStats);
+
+// Get specific transaction by ID
+router.get('/transactions/:id', authenticate, isAdmin, getTransactionById);
+
+// Create manual transaction (admin only)
+router.post('/transactions', authenticate, isAdmin, createManualTransaction);
+
+// Update transaction (limited fields for safety)
+router.put('/transactions/:id', authenticate, isAdmin, updateTransaction);
+
+// Reverse/void a transaction
+router.post('/transactions/:id/reverse', authenticate, isAdmin, reverseTransaction);
+
+// Delete transaction (hard delete with confirmation)
+router.delete('/transactions/:id', authenticate, isAdmin, deleteTransaction);
+
+// Bulk operations on transactions
+router.post('/transactions/bulk', authenticate, isAdmin, bulkOperations);
+
+// ========================================
+// LEGACY SIMPLE ROUTES (kept for compatibility)
+// ========================================
+
+// Simple get all transactions (legacy)
+router.get('/transactions/simple', authenticate, isAdmin, async (req, res) => {
   const transactions = await Transaction.findAll();
   res.json(transactions);
 });
@@ -40,8 +82,8 @@ router.delete('/accounts/:id', authenticate, isAdmin, async (req, res) => {
   res.json({ message: 'Account deleted' });
 });
 
-// Delete a transaction
-router.delete('/transactions/:id', authenticate, isAdmin, async (req, res) => {
+// Delete a transaction (simple legacy method)
+router.delete('/transactions/:id/simple', authenticate, isAdmin, async (req, res) => {
   await Transaction.destroy({ where: { id: req.params.id } });
   res.json({ message: 'Transaction deleted' });
 });

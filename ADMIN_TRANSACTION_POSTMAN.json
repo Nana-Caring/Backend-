@@ -1,0 +1,473 @@
+{
+  "info": {
+    "_postman_id": "admin-transactions-collection",
+    "name": "Admin Transaction Management",
+    "description": "Complete collection for testing admin transaction management endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{adminToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "// Set base URL if not already set",
+          "if (!pm.environment.get('baseUrl')) {",
+          "    pm.environment.set('baseUrl', 'http://localhost:3000');",
+          "}"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Admin Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('adminToken', response.token);",
+                  "    pm.environment.set('adminId', response.user.id);",
+                  "    console.log('Admin token set successfully');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin_password\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transaction Management",
+      "item": [
+        {
+          "name": "Get All Transactions (Basic)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions"]
+            }
+          }
+        },
+        {
+          "name": "Get Transactions with Filters",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions?page=1&limit=10&type=Credit&sortBy=amount&sortOrder=DESC",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "10"},
+                {"key": "type", "value": "Credit"},
+                {"key": "sortBy", "value": "amount"},
+                {"key": "sortOrder", "value": "DESC"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Transactions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions?search=transfer&startDate=2025-01-01",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions"],
+              "query": [
+                {"key": "search", "value": "transfer"},
+                {"key": "startDate", "value": "2025-01-01"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Transaction by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions/{{transactionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions", "{{transactionId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transaction Creation",
+      "item": [
+        {
+          "name": "Create Manual Credit Transaction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('lastTransactionId', response.data.id);",
+                  "    console.log('Created transaction ID:', response.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountId\": \"{{testAccountId}}\",\n  \"amount\": 50.00,\n  \"type\": \"Credit\",\n  \"description\": \"Manual admin credit - test\",\n  \"reference\": \"admin-test-{{$timestamp}}\",\n  \"metadata\": {\n    \"reason\": \"Testing admin transaction creation\",\n    \"category\": \"test\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions"]
+            }
+          }
+        },
+        {
+          "name": "Create Manual Debit Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountId\": \"{{testAccountId}}\",\n  \"amount\": 25.00,\n  \"type\": \"Debit\",\n  \"description\": \"Manual admin debit - test\",\n  \"metadata\": {\n    \"reason\": \"Testing admin debit transaction\",\n    \"category\": \"test\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transaction Updates",
+      "item": [
+        {
+          "name": "Update Transaction Description",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated description via admin panel\",\n  \"metadata\": {\n    \"updateReason\": \"Correction needed\",\n    \"updatedVia\": \"admin_panel\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions/{{lastTransactionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions", "{{lastTransactionId}}"]
+            }
+          }
+        },
+        {
+          "name": "Reverse Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Customer dispute - admin reversal test\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions/{{lastTransactionId}}/reverse",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions", "{{lastTransactionId}}", "reverse"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transaction Statistics",
+      "item": [
+        {
+          "name": "Get Overall Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Get Stats for Date Range",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions/stats?startDate=2025-01-01&endDate=2025-12-31",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions", "stats"],
+              "query": [
+                {"key": "startDate", "value": "2025-01-01"},
+                {"key": "endDate", "value": "2025-12-31"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Stats for Specific Account",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions/stats?accountId={{testAccountId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions", "stats"],
+              "query": [
+                {"key": "accountId", "value": "{{testAccountId}}"}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bulk Operations",
+      "item": [
+        {
+          "name": "Bulk Update Descriptions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"operation\": \"updateDescription\",\n  \"transactionIds\": [\n    \"{{transactionId1}}\",\n    \"{{transactionId2}}\"\n  ],\n  \"data\": {\n    \"description\": \"Bulk updated by admin\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions/bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions", "bulk"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Delete Transactions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"operation\": \"delete\",\n  \"transactionIds\": [\n    \"{{transactionId1}}\",\n    \"{{transactionId2}}\"\n  ],\n  \"data\": {\n    \"confirmDelete\": true\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions/bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions", "bulk"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transaction Deletion",
+      "item": [
+        {
+          "name": "Delete Single Transaction",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"confirmDelete\": true,\n  \"adjustBalance\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions/{{lastTransactionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions", "{{lastTransactionId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Without Balance Adjustment",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"confirmDelete\": true,\n  \"adjustBalance\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions/{{transactionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions", "{{transactionId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Legacy Endpoints",
+      "item": [
+        {
+          "name": "Get Transactions (Simple)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions/simple",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions", "simple"]
+            }
+          }
+        },
+        {
+          "name": "Delete Transaction (Simple)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/transactions/{{transactionId}}/simple",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "transactions", "{{transactionId}}", "simple"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Helper Requests",
+      "item": [
+        {
+          "name": "Get All Accounts (for testing)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const accounts = pm.response.json();",
+                  "    if (accounts.length > 0) {",
+                  "        pm.environment.set('testAccountId', accounts[0].id);",
+                  "        console.log('Test account ID set:', accounts[0].id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/accounts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "accounts"]
+            }
+          }
+        },
+        {
+          "name": "Get All Users (for testing)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
