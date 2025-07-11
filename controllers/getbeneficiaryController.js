@@ -10,12 +10,12 @@ exports.getMyBeneficiaries = async (req, res) => {
         {
           model: db.User,
           as: 'dependent',
-          attributes: ['id', 'firstName', 'middleName', 'email'],
+          attributes: ['id', 'firstName', 'middleName', 'surname', 'email'],
           include:[
             {
               model: db.Account,
               as: 'accounts',
-              attributes: ['accountNumber', 'accountType']
+              attributes: ['id', 'accountNumber', 'accountType', 'balance', 'status']
             }
           ]
         }
@@ -29,9 +29,19 @@ exports.getMyBeneficiaries = async (req, res) => {
     id: dep.id,
     firstName: dep.firstName,
     middleName: dep.middleName,
+    surname: dep.surname,
     email: dep.email,
+    name: `${dep.firstName} ${dep.surname}`,
     accountNumber: account ? account.accountNumber : null,
-    accountType: account ? account.accountType : null
+    accountType: account ? account.accountType : null,
+    account: account ? {
+      id: account.id,
+      accountNumber: account.accountNumber,
+      accountType: account.accountType,
+      balance: parseFloat(account.balance) || 0,
+      status: account.status
+    } : null,
+    hasActiveAccount: !!account
   };
 });
 
