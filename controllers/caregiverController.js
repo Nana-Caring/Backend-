@@ -1,5 +1,5 @@
 const { User, Account, Transaction } = require('../models');
-const { Op } = require('sequelize');
+const { Op, Sequelize } = require('sequelize');
 
 // Get all dependents assigned to this caregiver
 const getCaregiverDependents = async (req, res) => {
@@ -268,9 +268,9 @@ const getCaregiverStats = async (req, res) => {
             ]
         });
 
-        // Get dependents by status
-        const dependentsByStatus = await User.findAll({
-            where: { role: 'dependent' },
+        // Get dependents by status (simplified approach)
+        const activeDependents = await User.count({
+            where: { role: 'dependent', status: 'active' },
             include: [
                 {
                     model: Account,
@@ -278,13 +278,43 @@ const getCaregiverStats = async (req, res) => {
                     where: { caregiverId: caregiverId },
                     required: true
                 }
-            ],
-            attributes: [
-                'status',
-                [User.sequelize.fn('COUNT', User.sequelize.col('User.id')), 'count']
-            ],
-            group: ['status'],
-            raw: true
+            ]
+        });
+
+        const blockedDependents = await User.count({
+            where: { role: 'dependent', status: 'blocked' },
+            include: [
+                {
+                    model: Account,
+                    as: 'accounts',
+                    where: { caregiverId: caregiverId },
+                    required: true
+                }
+            ]
+        });
+
+        const suspendedDependents = await User.count({
+            where: { role: 'dependent', status: 'suspended' },
+            include: [
+                {
+                    model: Account,
+                    as: 'accounts',
+                    where: { caregiverId: caregiverId },
+                    required: true
+                }
+            ]
+        });
+
+        const pendingDependents = await User.count({
+            where: { role: 'dependent', status: 'pending' },
+            include: [
+                {
+                    model: Account,
+                    as: 'accounts',
+                    where: { caregiverId: caregiverId },
+                    required: true
+                }
+            ]
         });
 
         // Get total balance across all dependents
@@ -312,23 +342,17 @@ const getCaregiverStats = async (req, res) => {
             }
         });
 
-        // Transform status counts
-        const statusCounts = dependentsByStatus.reduce((acc, item) => {
-            acc[item.status] = parseInt(item.count);
-            return acc;
-        }, {
-            active: 0,
-            blocked: 0,
-            suspended: 0,
-            pending: 0
-        });
-
         res.status(200).json({
             success: true,
             message: 'Caregiver statistics retrieved successfully',
             data: {
                 totalDependents,
-                dependentsByStatus: statusCounts,
+                dependentsByStatus: {
+                    active: activeDependents,
+                    blocked: blockedDependents,
+                    suspended: suspendedDependents,
+                    pending: pendingDependents
+                },
                 totalAccountBalance: parseFloat(totalBalance),
                 recentTransactionsCount,
                 currency: 'ZAR'
