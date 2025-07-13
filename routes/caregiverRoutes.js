@@ -26,13 +26,16 @@ router.use(isCaregiverRole);
 // Get all dependents assigned to this caregiver
 router.get('/dependents', getCaregiverDependents);
 
-// Get caregiver dashboard statistics
+
+// Get all dependents with relationship info
+router.get('/dependents-with-relationship', require('../controllers/caregiverController').getCaregiverDependentsWithRelationship);
+
+// Get specific dependent's relationship to caregiver
+router.get('/dependents/:dependentId/relationship', require('../controllers/caregiverController').getDependentRelationship);
+
+// Existing endpoints
 router.get('/stats', getCaregiverStats);
-
-// Get recent activity across all dependents
 router.get('/activity', getRecentActivity);
-
-// Get specific dependent details by ID
 router.get('/dependents/:dependentId', getDependentById);
 
 module.exports = router;
