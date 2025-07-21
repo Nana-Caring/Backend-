@@ -1,8 +1,10 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const User = require("../models/User");
 const Account = require("../models/Account");
 const { Sequelize, Op } = require('sequelize');
+// Email service removed - frontend handles UI
 // const generateUniqueAccountNumber = require('../utils/generateUniqueAccountNumber');
 const { generateUniqueAccountNumber } = require('../utils/generateUniqueAccountNumber');
 
@@ -475,5 +477,102 @@ exports.adminLogin = async (req, res) => {
   } catch (error) {
     console.error('Admin login error:', error);
     res.status(500).json({ error: 'Admin login failed' });
+  }
+};
+
+// Forgot Password
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ where: { email } });
+    
+    if (!user) {
+      // Don't reveal if email exists or not for security
+      return res.status(200).json({ 
+        message: 'If that email address is in our system, we have sent you an email with instructions to reset your password.' 
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    
+    // Set token and expiration (15 minutes to match login token expiration)
+    const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    
+    // Update user with reset token
+    await user.update({
+      resetPasswordToken: resetToken,
+      resetPasswordExpires: resetTokenExpiry
+    });
+
+    // Return token for frontend to handle (in development/testing)
+    // In production, you would send this via email
+    res.status(200).json({ 
+      message: 'Password reset token generated successfully.',
+      token: resetToken // Frontend can use this for testing
+    });
+
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ message: 'Server error. Please try again later.' });
+  }
+};
+
+// Reset Password
+exports.resetPassword = async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    
+    // Extract token from Authorization header (Bearer token)
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith('Bearer ') 
+      ? authHeader.substring(7) // Remove 'Bearer ' prefix
+      : null;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: 'Authorization token and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+    }
+
+    // Find user with valid reset token
+    const user = await User.findOne({
+      where: {
+        resetPasswordToken: token,
+        resetPasswordExpires: {
+          [Op.gt]: new Date() // Token hasn't expired
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired reset token' });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update user password and clear reset token
+    await user.update({
+      password: hashedPassword,
+      resetPasswordToken: null,
+      resetPasswordExpires: null
+    });
+
+    res.status(200).json({ 
+      message: 'Password has been reset successfully. You can now log in with your new password.' 
+    });
+
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Server error. Please try again later.' });
   }
 };

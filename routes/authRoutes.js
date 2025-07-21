@@ -1,6 +1,6 @@
 const express = require("express");
 const { check } = require("express-validator");
-const { register, login, getUser, registerDependent, adminLogin } = require("../controllers/authController");
+const { register, login, getUser, registerDependent, adminLogin, forgotPassword, resetPassword } = require("../controllers/authController");
 const authMiddleware = require("../middlewares/auth");
 
 const router = express.Router();
@@ -49,5 +49,24 @@ router.post(
 
 // GET CURRENT USER
 router.get("/me", authMiddleware, getUser);
+
+// FORGOT PASSWORD
+router.post(
+  "/forgot-password",
+  [
+    check("email", "Include a valid email").isEmail(),
+  ],
+  forgotPassword
+);
+
+// RESET PASSWORD
+router.post(
+  "/reset-password",
+  [
+    check("token", "Reset token is required").not().isEmpty(),
+    check("newPassword", "Password must be at least 10 characters").isLength({ min: 6 }),
+  ],
+  resetPassword
+);
 
 module.exports = router;

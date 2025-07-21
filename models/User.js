@@ -133,6 +133,17 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true,
     comment: 'Stripe customer ID for payment processing'
+  },
+  // Password reset fields
+  resetPasswordToken: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'Token for password reset verification'
+  },
+  resetPasswordExpires: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: 'Expiration time for password reset token'
   }
 
 }, {
