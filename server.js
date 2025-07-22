@@ -35,6 +35,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Routes
+const portalRoutes = require('./routes/portal');
 app.use('/api/stripe', stripeRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/admin', adminRoutes);
@@ -44,6 +45,7 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/payment-cards', paymentCardRoutes);
 app.use('/api/transfers', transferRoutes);
+app.use('/api/portal', portalRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
