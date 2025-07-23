@@ -11,22 +11,30 @@ This portal allows users to securely view and manage their accounts, transaction
 
 ## Endpoints
 
-### 1. Login
+
+### 1. Portal Login (Admin-as-User)
 ```
-POST /api/auth/login
+POST /api/portal/admin-login
 {
-  "email": "user@example.com",
-  "password": "userPassword"
+  "username": "user@example.com", // user's email
+  "password": "userPassword"       // user's password
 }
 ```
-- Returns: `{ token: <JWT> }`
+- Returns: `{ token: <portalJWT>, user: { ... } }`
+
+**Description:**
+- Admin logs in to the portal using the credentials of the user whose portal they wish to access.
+- The portal issues a special JWT token scoped for that user.
+- All subsequent requests to portal endpoints must use this token.
+
 
 ---
 
-### 2. Get User Details (Dynamic)
+
+### 2. Get User Details (Private via Portal)
 ```
 GET /api/portal/me
-Authorization: Bearer <token>
+Authorization: Bearer <portalJWT>
 ```
 - Returns: User profile info, dependents, accounts, and recent transactions
 
@@ -51,10 +59,11 @@ Authorization: Bearer <token>
 
 ---
 
-### 3. Get User Accounts (Advanced)
+
+### 3. Get User Accounts (Private via Portal)
 ```
 GET /api/portal/me/accounts
-Authorization: Bearer <token>
+Authorization: Bearer <portalJWT>
 ```
 - Returns: List of user's accounts, each with sub-accounts and parent account info
 
@@ -88,12 +97,25 @@ Authorization: Bearer <token>
 
 ---
 
-### 4. Get User Transactions (Advanced)
+
+### 4. Get User Transactions (Private via Portal)
 ```
 GET /api/portal/me/transactions?type=Credit&startDate=2025-07-01&endDate=2025-07-23&search=school&page=1&limit=10
-Authorization: Bearer <token>
+Authorization: Bearer <portalJWT>
 ```
 - Returns: List of user's transactions with advanced filtering and pagination
+### 5. Edit User Details (Private via Portal)
+```
+PUT /api/portal/me
+Authorization: Bearer <portalJWT>
+{
+  "firstName": "NewName",
+  "surname": "NewSurname",
+  "email": "new.email@example.com",
+  ...
+}
+```
+- Allows editing of user details, only accessible via portal login.
 
 **Response Example:**
 ```
@@ -110,32 +132,7 @@ Authorization: Bearer <token>
 
 ---
 
-### 5. Admin Requests Access to User Portal
-```
-POST /api/portal/request-access/:userId
-Authorization: Bearer <admin-token>
-```
-- Admin requests access; triggers user notification/approval
 
----
-
-### 6. User Approves Admin Access
-```
-POST /api/portal/approve-access/:adminId
-Authorization: Bearer <user-token>
-```
-- User approves admin access; admin receives temporary token
-
----
-
-### 7. Admin Accesses User Portal (with approval)
-```
-GET /api/portal/user/:userId
-Authorization: Bearer <admin-temp-token>
-```
-- Returns: User's portal data (accounts, transactions, details)
-
----
 
 ## Security Notes
 - All portal endpoints require authentication.

@@ -1,4 +1,34 @@
-const { Transaction, Account, User, PaymentCard } = require('../models');
+// Portal admin login: authenticate as user and issue portal JWT
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { User } = require('../models');
+
+const portalAdminLogin = async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const user = await User.findOne({ where: { email: username } });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        const valid = await bcrypt.compare(password, user.password);
+        if (!valid) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+        // Issue a portal JWT scoped for this user
+        const token = jwt.sign({ id: user.id, role: user.role, portal: true }, process.env.JWT_SECRET, { expiresIn: '2h' });
+        res.json({ token, user: {
+            id: user.id,
+            firstName: user.firstName,
+            surname: user.surname,
+            email: user.email,
+            role: user.role,
+            status: user.status
+        }});
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+const { Transaction, Account, PaymentCard } = require('../models');
 const { Op } = require('sequelize');
 
 // Get all transactions with filters and pagination
@@ -664,6 +694,7 @@ const bulkOperations = async (req, res) => {
 };
 
 module.exports = {
+    portalAdminLogin,
     getAllTransactions,
     getTransactionById,
     createManualTransaction,
