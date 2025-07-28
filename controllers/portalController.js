@@ -1,4 +1,5 @@
 const { User, Account, Transaction } = require('../models');
+const { Op } = require('sequelize'); // Add this at the top
 
 
 // Get user details with dependents, accounts, and recent activity
@@ -84,18 +85,18 @@ exports.getUserTransactions = async (req, res) => {
         if (type) whereClause.type = type;
         if (startDate || endDate) {
             whereClause.createdAt = {};
-            if (startDate) whereClause.createdAt['$gte'] = new Date(startDate);
-            if (endDate) whereClause.createdAt['$lte'] = new Date(endDate);
+            if (startDate) whereClause.createdAt[Op.gte] = new Date(startDate);
+            if (endDate) whereClause.createdAt[Op.lte] = new Date(endDate);
         }
         if (minAmount || maxAmount) {
             whereClause.amount = {};
-            if (minAmount) whereClause.amount['$gte'] = parseFloat(minAmount);
-            if (maxAmount) whereClause.amount['$lte'] = parseFloat(maxAmount);
+            if (minAmount) whereClause.amount[Op.gte] = parseFloat(minAmount);
+            if (maxAmount) whereClause.amount[Op.lte] = parseFloat(maxAmount);
         }
         if (search) {
-            whereClause['$or'] = [
-                { description: { $like: `%${search}%` } },
-                { reference: { $like: `%${search}%` } }
+            whereClause[Op.or] = [
+                { description: { [Op.like]: `%${search}%` } },
+                { reference: { [Op.like]: `%${search}%` } }
             ];
         }
         const offset = (page - 1) * limit;
@@ -132,6 +133,26 @@ exports.getUserTransactions = async (req, res) => {
                 pages: Math.ceil(transactions.count / limit)
             }
         });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+// Update user profile (admin or user via portal)
+exports.updateUserProfile = async (req, res) => {
+    try {
+        const { email, firstName, surname, username } = req.body;
+        const user = await User.findByPk(req.user.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        // Update fields if provided
+        if (email) user.email = email;
+        if (firstName) user.firstName = firstName;
+        if (surname) user.surname = surname;
+        if (username) user.username = username;
+        await user.save();
+        res.json({ message: 'User profile updated successfully', user });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
