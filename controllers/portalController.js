@@ -104,7 +104,24 @@ exports.getUserTransactions = async (req, res) => {
             order: [[sortBy, sortOrder.toUpperCase()]],
             limit: parseInt(limit),
             offset: parseInt(offset),
-            attributes: ['id', 'accountId', 'amount', 'type', 'description', 'reference', 'createdAt', 'updatedAt']
+            attributes: [
+                'id',
+                'accountId',
+                'amount',
+                'type',
+                'description',
+                'reference',
+                'metadata',      // Include metadata for source info
+                'createdAt',     // Date/time of transaction
+                'updatedAt'
+            ],
+            include: [
+                {
+                    model: Account,
+                    as: 'account',
+                    attributes: ['accountNumber', 'accountType']
+                }
+            ]
         });
         res.json({
             transactions: transactions.rows,
