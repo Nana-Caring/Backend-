@@ -9,8 +9,31 @@ router.post('/admin-login', portalAdminLogin);
 
 // User portal endpoints
 router.get('/me', authenticate, portalController.getUserDetails);
+router.put('/me', authenticate, portalController.updateUserProfile);
 router.get('/me/accounts', authenticate, portalController.getUserAccounts);
 router.get('/me/transactions', authenticate, portalController.getUserTransactions);
+
+// Admin reset user password directly (for current logged-in user)
+router.post('/reset-password', authenticate, async (req, res) => {
+    const { newPassword } = req.body;
+    if (!newPassword) {
+        return res.status(400).json({ message: 'New password is required.' });
+    }
+    try {
+        const { User } = require('../models');
+        const user = await User.findByPk(req.user.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        // Hash the new password
+        const bcrypt = require('bcryptjs');
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await user.update({ password: hashedPassword });
+        res.json({ message: 'Password reset successful for user: ' + user.email });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
 
 // Admin reset user password by email
 router.post('/reset-user-password', authenticate, async (req, res) => {
