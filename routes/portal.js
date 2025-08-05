@@ -56,7 +56,8 @@ router.post('/reset-user-password', authenticate, async (req, res) => {
     }
 });
 
-// Admin request password reset link for user
+// Admin request password reset link for user (TEMPORARILY DISABLED - PENDING DB UPDATE)
+/*
 router.post('/request-password-reset', authenticate, async (req, res) => {
     const { email } = req.body;
     if (!email) {
@@ -89,8 +90,8 @@ router.post('/request-password-reset', authenticate, async (req, res) => {
     }
 });
 
-// Endpoint to reset password using token
-router.post('/reset-password', async (req, res) => {
+// Endpoint to reset password using token (TEMPORARILY DISABLED - PENDING DB UPDATE)
+router.post('/reset-password-token', async (req, res) => {
     const { email, token, newPassword } = req.body;
     if (!email || !token || !newPassword) {
         return res.status(400).json({ message: 'Email, token, and new password are required.' });
@@ -110,5 +111,6 @@ router.post('/reset-password', async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
+*/
 
 module.exports = router;
