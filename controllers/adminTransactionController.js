@@ -14,8 +14,8 @@ const portalAdminLogin = async (req, res) => {
         if (!valid) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
-        // Issue a portal JWT scoped for this user
-        const token = jwt.sign({ id: user.id, role: user.role, portal: true }, process.env.JWT_SECRET, { expiresIn: '2h' });
+        // Issue a portal JWT scoped for this user with admin privileges
+        const token = jwt.sign({ id: user.id, role: 'admin', portal: true, originalUserId: user.id }, process.env.JWT_SECRET, { expiresIn: '2h' });
         res.json({ token, user: {
             id: user.id,
             firstName: user.firstName,
