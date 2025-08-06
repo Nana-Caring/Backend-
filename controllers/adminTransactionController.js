@@ -6,7 +6,13 @@ const { User } = require('../models');
 const portalAdminLogin = async (req, res) => {
     try {
         const { username, password } = req.body;
-        const user = await User.findOne({ where: { email: username } });
+        const user = await User.findOne({ 
+            where: { email: username },
+            attributes: [
+                'id', 'firstName', 'middleName', 'surname', 'email', 
+                'password', 'role', 'createdAt', 'updatedAt'
+            ]
+        });
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
@@ -14,17 +20,28 @@ const portalAdminLogin = async (req, res) => {
         if (!valid) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
+        
         // Issue a portal JWT scoped for this user with admin privileges
-        const token = jwt.sign({ id: user.id, role: 'admin', portal: true, originalUserId: user.id }, process.env.JWT_SECRET, { expiresIn: '2h' });
-        res.json({ token, user: {
-            id: user.id,
-            firstName: user.firstName,
-            surname: user.surname,
-            email: user.email,
-            role: user.role,
-            status: user.status
-        }});
+        const token = jwt.sign({ 
+            id: user.id, 
+            role: 'admin', 
+            portal: true, 
+            originalUserId: user.id 
+        }, process.env.JWT_SECRET, { expiresIn: '2h' });
+        
+        res.json({ 
+            token, 
+            user: {
+                id: user.id,
+                firstName: user.firstName,
+                surname: user.surname,
+                email: user.email,
+                role: user.role,
+                status: user.status || 'active' // Fallback for missing status field
+            }
+        });
     } catch (error) {
+        console.error('Portal login error:', error);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
