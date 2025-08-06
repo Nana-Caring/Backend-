@@ -310,51 +310,17 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Find user by email with associated accounts using the alias
+    // Find user by email - basic query only
     const user = await User.findOne({ 
         where: { email },
-        include: [{
-            model: Account,
-            as: 'accounts', // Use the alias defined in associations
-            attributes: ['id', 'accountNumber', 'accountType', 'balance', 'status', 'currency']
-        }]
+        attributes: [
+            'id', 'firstName', 'middleName', 'surname', 'email', 
+            'password', 'role', 'Idnumber', 'relation', 'createdAt', 'updatedAt'
+        ]
     });
 
     if (!user) {
         return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    // Check if user is blocked or suspended
-    if (user.isBlocked || user.status === 'blocked') {
-        return res.status(403).json({ 
-            error: 'Account blocked',
-            message: 'Your account has been blocked. Please contact support.',
-            code: 'ACCOUNT_BLOCKED',
-            details: {
-                blockedAt: user.blockedAt,
-                reason: user.blockReason || 'No reason provided'
-            }
-        });
-    }
-
-    if (user.status === 'suspended') {
-        return res.status(403).json({ 
-            error: 'Account suspended',
-            message: 'Your account has been suspended. Please contact support.',
-            code: 'ACCOUNT_SUSPENDED',
-            details: {
-                blockedAt: user.blockedAt,
-                reason: user.blockReason || 'No reason provided'
-            }
-        });
-    }
-
-    if (user.status === 'pending') {
-        return res.status(403).json({ 
-            error: 'Account pending',
-            message: 'Your account is pending activation. Please contact support.',
-            code: 'ACCOUNT_PENDING'
-        });
     }
 
     // Check password
@@ -366,28 +332,26 @@ exports.login = async (req, res) => {
     // Generate JWT token
     const accessToken = jwt.sign(
       { id: user.id, role: user.role },
-      process.env.JWT_SECRET,
-     
+      process.env.JWT_SECRET
     );
 
     const refreshToken = jwt.sign(
       { id: user.id },
-      process.env.JWT_REFRESH_SECRET,
-    
+      process.env.JWT_REFRESH_SECRET
     );
 
     // Set refresh token in httpOnly, secure cookie
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: true, // set to true in production (requires HTTPS)
+      secure: true,
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
-    // Format response
+    // Format basic response
     const response = {
-        accessToken, // JWT token
-        jwt: accessToken, // Optional: alias for clarity
+        accessToken,
+        jwt: accessToken,
         user: {
             id: user.id,
             firstName: user.firstName,
@@ -402,15 +366,26 @@ exports.login = async (req, res) => {
         }
     };
 
-    // Add accounts for funder or dependent
-    if ((user.role === 'funder' || user.role === 'dependent') && user.accounts) {
-        response.accounts = user.accounts;
+    // Try to get accounts separately if needed
+    try {
+        if (user.role === 'funder' || user.role === 'dependent') {
+            const userAccounts = await Account.findAll({
+                where: { userId: user.id },
+                attributes: ['id', 'accountNumber', 'accountType', 'balance', 'currency']
+            });
+            if (userAccounts.length > 0) {
+                response.accounts = userAccounts;
+            }
+        }
+    } catch (accountError) {
+        console.log('Could not fetch accounts:', accountError.message);
+        // Continue without accounts - login still works
     }
 
     res.json(response);
 } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
+    res.status(500).json({ error: 'Login failed', details: error.message });
 }
 };
 

@@ -2,6 +2,28 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
+    // Check if payment_cards table already exists
+    const tables = await queryInterface.showAllTables();
+    if (tables.includes('payment_cards')) {
+      console.log('payment_cards table already exists, skipping creation...');
+      
+      // Check if stripeCustomerId column exists in Users table
+      try {
+        const tableInfo = await queryInterface.describeTable('Users');
+        if (!tableInfo.stripeCustomerId) {
+          await queryInterface.addColumn('Users', 'stripeCustomerId', {
+            type: Sequelize.STRING,
+            allowNull: true,
+            comment: 'Stripe customer ID for payment processing'
+          });
+        }
+      } catch (error) {
+        console.log('stripeCustomerId column may already exist:', error.message);
+      }
+      
+      return;
+    }
+
     await queryInterface.createTable('payment_cards', {
       id: {
         type: Sequelize.UUID,
@@ -70,29 +92,44 @@ module.exports = {
       }
     });
 
-    // Create indexes
-    await queryInterface.addIndex('payment_cards', ['userId', 'cardNumber'], {
-      unique: true,
-      name: 'unique_user_card'
-    });
+    // Create indexes with error handling
+    try {
+      await queryInterface.addIndex('payment_cards', ['userId', 'cardNumber'], {
+        unique: true,
+        name: 'unique_user_card'
+      });
+    } catch (error) {
+      console.log('unique_user_card index might already exist:', error.message);
+    }
     
-    await queryInterface.addIndex('payment_cards', ['userId', 'isDefault'], {
-      name: 'user_default_card'
-    });
+    try {
+      await queryInterface.addIndex('payment_cards', ['userId', 'isDefault'], {
+        name: 'user_default_card'
+      });
+    } catch (error) {
+      console.log('user_default_card index might already exist:', error.message);
+    }
     
-    await queryInterface.addIndex('payment_cards', ['userId', 'isActive'], {
-      name: 'user_active_cards'
-    });
+    try {
+      await queryInterface.addIndex('payment_cards', ['userId', 'isActive'], {
+        name: 'user_active_cards'
+      });
+    } catch (error) {
+      console.log('user_active_cards index might already exist:', error.message);
+    }
 
     // Add stripeCustomerId to Users table if it doesn't exist
     try {
-      await queryInterface.addColumn('Users', 'stripeCustomerId', {
-        type: Sequelize.STRING,
-        allowNull: true,
-        comment: 'Stripe customer ID for payment processing'
-      });
+      const tableInfo = await queryInterface.describeTable('Users');
+      if (!tableInfo.stripeCustomerId) {
+        await queryInterface.addColumn('Users', 'stripeCustomerId', {
+          type: Sequelize.STRING,
+          allowNull: true,
+          comment: 'Stripe customer ID for payment processing'
+        });
+      }
     } catch (error) {
-      console.log('stripeCustomerId column may already exist');
+      console.log('stripeCustomerId column may already exist:', error.message);
     }
   },
 

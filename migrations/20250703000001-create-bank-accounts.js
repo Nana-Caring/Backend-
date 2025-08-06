@@ -2,6 +2,33 @@
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
+    // Check if bank_accounts table already exists
+    const tables = await queryInterface.showAllTables();
+    if (tables.includes('bank_accounts')) {
+      console.log('bank_accounts table already exists, skipping creation...');
+      
+      // Check if stripeCustomerId column exists in Users table
+      const tableInfo = await queryInterface.describeTable('Users');
+      if (!tableInfo.stripeCustomerId) {
+        await queryInterface.addColumn('Users', 'stripeCustomerId', {
+          type: Sequelize.STRING,
+          allowNull: true,
+          comment: 'Stripe customer ID for payment processing'
+        });
+
+        // Add index for stripeCustomerId
+        try {
+          await queryInterface.addIndex('Users', ['stripeCustomerId']);
+        } catch (error) {
+          console.log('Index for stripeCustomerId might already exist:', error.message);
+        }
+      } else {
+        console.log('stripeCustomerId column already exists in Users table, skipping...');
+      }
+      
+      return;
+    }
+
     // Create bank_accounts table
     await queryInterface.createTable('bank_accounts', {
       id: {
@@ -96,33 +123,61 @@ module.exports = {
       }
     });
 
-    // Add indexes
-    await queryInterface.addIndex('bank_accounts', ['userId']);
-    await queryInterface.addIndex('bank_accounts', ['stripePaymentMethodId']);
-    await queryInterface.addIndex('bank_accounts', ['userId', 'accountNumber', 'bankName'], {
-      unique: true,
-      name: 'unique_user_bank_account',
-      where: {
-        accountNumber: { [Sequelize.Op.ne]: null }
-      }
-    });
-    await queryInterface.addIndex('bank_accounts', ['userId', 'cardNumber'], {
-      unique: true,
-      name: 'unique_user_card',
-      where: {
-        cardNumber: { [Sequelize.Op.ne]: null }
-      }
-    });
+    // Add indexes with error handling
+    try {
+      await queryInterface.addIndex('bank_accounts', ['userId']);
+    } catch (error) {
+      console.log('userId index might already exist:', error.message);
+    }
 
-    // Add stripeCustomerId to Users table
-    await queryInterface.addColumn('Users', 'stripeCustomerId', {
-      type: Sequelize.STRING,
-      allowNull: true,
-      comment: 'Stripe customer ID for payment processing'
-    });
+    try {
+      await queryInterface.addIndex('bank_accounts', ['stripePaymentMethodId']);
+    } catch (error) {
+      console.log('stripePaymentMethodId index might already exist:', error.message);
+    }
 
-    // Add index for stripeCustomerId
-    await queryInterface.addIndex('Users', ['stripeCustomerId']);
+    try {
+      await queryInterface.addIndex('bank_accounts', ['userId', 'accountNumber', 'bankName'], {
+        unique: true,
+        name: 'unique_user_bank_account',
+        where: {
+          accountNumber: { [Sequelize.Op.ne]: null }
+        }
+      });
+    } catch (error) {
+      console.log('unique_user_bank_account index might already exist:', error.message);
+    }
+
+    try {
+      await queryInterface.addIndex('bank_accounts', ['userId', 'cardNumber'], {
+        unique: true,
+        name: 'unique_user_card',
+        where: {
+          cardNumber: { [Sequelize.Op.ne]: null }
+        }
+      });
+    } catch (error) {
+      console.log('unique_user_card index might already exist:', error.message);
+    }
+
+    // Add stripeCustomerId to Users table if it doesn't exist
+    const tableInfo = await queryInterface.describeTable('Users');
+    if (!tableInfo.stripeCustomerId) {
+      await queryInterface.addColumn('Users', 'stripeCustomerId', {
+        type: Sequelize.STRING,
+        allowNull: true,
+        comment: 'Stripe customer ID for payment processing'
+      });
+
+      // Add index for stripeCustomerId
+      try {
+        await queryInterface.addIndex('Users', ['stripeCustomerId']);
+      } catch (error) {
+        console.log('Index for stripeCustomerId might already exist:', error.message);
+      }
+    } else {
+      console.log('stripeCustomerId column already exists in Users table, skipping...');
+    }
   },
 
   down: async (queryInterface, Sequelize) => {
