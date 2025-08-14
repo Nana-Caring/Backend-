@@ -90,4 +90,190 @@ function getWelcomeEmail({ user, password, loginUrl = 'https://nanacaring-backen
     `;
 }
 
-module.exports = { sendMail, getPasswordResetEmail, getWelcomeEmail };
+module.exports = {
+    sendMail,
+    getPasswordResetEmail,
+    getWelcomeEmail,
+    getUserBlockedEmail,
+    getUserSuspendedEmail,
+    getUserUnblockedEmail,
+    getUserUnsuspendedEmail,
+    getAccountDeletedEmail
+};
+
+// Helper to generate user blocked email
+function getUserBlockedEmail({ user, reason, blockedBy }) {
+    return `
+        <div style="font-family: Arial, sans-serif; background: #fff5f5; padding: 32px; border-radius: 8px; max-width: 520px; margin: auto; border-left: 4px solid #ef4444;">
+            <div style="text-align: center; margin-bottom: 24px;">
+                <h2 style="color: #ef4444; margin: 0;">Account Blocked</h2>
+            </div>
+            <p style="font-size: 16px;">Dear ${user.firstName} ${user.surname},</p>
+            <p style="font-size: 15px;">Your NANA Portal account has been <strong>blocked</strong> by an administrator.</p>
+            
+            <div style="background: #fef2f2; padding: 16px; border-radius: 4px; margin: 16px 0; border-left: 3px solid #ef4444;">
+                <h4 style="margin: 0 0 8px 0; color: #dc2626;">Reason for blocking:</h4>
+                <p style="margin: 0; font-size: 14px;">${reason || 'No specific reason provided'}</p>
+            </div>
+            
+            <p style="font-size: 14px;">You will no longer be able to access your account or use NANA Portal services.</p>
+            <p style="font-size: 14px;">If you believe this is an error, please contact our support team for assistance.</p>
+            
+            <div style="background: #f9fafb; padding: 16px; border-radius: 4px; margin: 24px 0;">
+                <p style="font-size: 13px; margin: 0; color: #6b7280;">
+                    <strong>Account Details:</strong><br>
+                    Email: ${user.email}<br>
+                    Blocked Date: ${new Date().toLocaleDateString()}
+                </p>
+            </div>
+            
+            <hr style="margin: 32px 0; border: none; border-top: 1px solid #eee;" />
+            <p style="font-size: 12px; color: #888; text-align: center;">NANA Portal Support Team &copy; 2025</p>
+        </div>
+    `;
+}
+
+// Helper to generate user suspended email
+function getUserSuspendedEmail({ user, reason, suspendedUntil, suspendedBy }) {
+    const suspensionEndDate = new Date(suspendedUntil).toLocaleDateString();
+    const suspensionDays = Math.ceil((new Date(suspendedUntil) - new Date()) / (1000 * 60 * 60 * 24));
+    
+    return `
+        <div style="font-family: Arial, sans-serif; background: #fffbeb; padding: 32px; border-radius: 8px; max-width: 520px; margin: auto; border-left: 4px solid #f59e0b;">
+            <div style="text-align: center; margin-bottom: 24px;">
+                <h2 style="color: #f59e0b; margin: 0;">Account Suspended</h2>
+            </div>
+            <p style="font-size: 16px;">Dear ${user.firstName} ${user.surname},</p>
+            <p style="font-size: 15px;">Your NANA Portal account has been <strong>temporarily suspended</strong> by an administrator.</p>
+            
+            <div style="background: #fef3c7; padding: 16px; border-radius: 4px; margin: 16px 0; border-left: 3px solid #f59e0b;">
+                <h4 style="margin: 0 0 8px 0; color: #d97706;">Reason for suspension:</h4>
+                <p style="margin: 0; font-size: 14px;">${reason || 'No specific reason provided'}</p>
+            </div>
+            
+            <div style="background: #f3f4f6; padding: 16px; border-radius: 4px; margin: 16px 0;">
+                <h4 style="margin: 0 0 8px 0; color: #374151;">Suspension Details:</h4>
+                <p style="margin: 0; font-size: 14px;">
+                    <strong>Suspension Duration:</strong> ${suspensionDays} days<br>
+                    <strong>Suspension End Date:</strong> ${suspensionEndDate}<br>
+                    <strong>Current Status:</strong> Suspended
+                </p>
+            </div>
+            
+            <p style="font-size: 14px;">During this period, you will not be able to access your account or use NANA Portal services.</p>
+            <p style="font-size: 14px;">Your account will be automatically reactivated on ${suspensionEndDate}.</p>
+            <p style="font-size: 14px;">If you believe this is an error, please contact our support team for assistance.</p>
+            
+            <div style="background: #f9fafb; padding: 16px; border-radius: 4px; margin: 24px 0;">
+                <p style="font-size: 13px; margin: 0; color: #6b7280;">
+                    <strong>Account Details:</strong><br>
+                    Email: ${user.email}<br>
+                    Suspended Date: ${new Date().toLocaleDateString()}<br>
+                    Reactivation Date: ${suspensionEndDate}
+                </p>
+            </div>
+            
+            <hr style="margin: 32px 0; border: none; border-top: 1px solid #eee;" />
+            <p style="font-size: 12px; color: #888; text-align: center;">NANA Portal Support Team &copy; 2025</p>
+        </div>
+    `;
+}
+
+// Helper to generate user unblocked email
+function getUserUnblockedEmail({ user }) {
+    return `
+        <div style="font-family: Arial, sans-serif; background: #f0fdf4; padding: 32px; border-radius: 8px; max-width: 520px; margin: auto; border-left: 4px solid #22c55e;">
+            <div style="text-align: center; margin-bottom: 24px;">
+                <h2 style="color: #22c55e; margin: 0;">Account Reactivated</h2>
+            </div>
+            <p style="font-size: 16px;">Dear ${user.firstName} ${user.surname},</p>
+            <p style="font-size: 15px;">Good news! Your NANA Portal account has been <strong>reactivated</strong> by an administrator.</p>
+            
+            <div style="background: #dcfce7; padding: 16px; border-radius: 4px; margin: 16px 0; border-left: 3px solid #22c55e;">
+                <h4 style="margin: 0 0 8px 0; color: #16a34a;">Account Status: Active</h4>
+                <p style="margin: 0; font-size: 14px;">You can now access all NANA Portal services again.</p>
+            </div>
+            
+            <p style="font-size: 14px;">You can now log in to your account and continue using NANA Portal services.</p>
+            <p style="font-size: 14px;">We apologize for any inconvenience caused during the blocking period.</p>
+            
+            <div style="background: #f9fafb; padding: 16px; border-radius: 4px; margin: 24px 0;">
+                <p style="font-size: 13px; margin: 0; color: #6b7280;">
+                    <strong>Account Details:</strong><br>
+                    Email: ${user.email}<br>
+                    Reactivated Date: ${new Date().toLocaleDateString()}<br>
+                    Status: Active
+                </p>
+            </div>
+            
+            <hr style="margin: 32px 0; border: none; border-top: 1px solid #eee;" />
+            <p style="font-size: 12px; color: #888; text-align: center;">NANA Portal Support Team &copy; 2025</p>
+        </div>
+    `;
+}
+
+// Helper to generate user unsuspended email
+function getUserUnsuspendedEmail({ user }) {
+    return `
+        <div style="font-family: Arial, sans-serif; background: #f0fdf4; padding: 32px; border-radius: 8px; max-width: 520px; margin: auto; border-left: 4px solid #22c55e;">
+            <div style="text-align: center; margin-bottom: 24px;">
+                <h2 style="color: #22c55e; margin: 0;">Suspension Lifted</h2>
+            </div>
+            <p style="font-size: 16px;">Dear ${user.firstName} ${user.surname},</p>
+            <p style="font-size: 15px;">Your NANA Portal account suspension has been <strong>lifted</strong> and your account is now active.</p>
+            
+            <div style="background: #dcfce7; padding: 16px; border-radius: 4px; margin: 16px 0; border-left: 3px solid #22c55e;">
+                <h4 style="margin: 0 0 8px 0; color: #16a34a;">Account Status: Active</h4>
+                <p style="margin: 0; font-size: 14px;">You can now access all NANA Portal services again.</p>
+            </div>
+            
+            <p style="font-size: 14px;">You can now log in to your account and continue using NANA Portal services.</p>
+            <p style="font-size: 14px;">Thank you for your patience during the suspension period.</p>
+            
+            <div style="background: #f9fafb; padding: 16px; border-radius: 4px; margin: 24px 0;">
+                <p style="font-size: 13px; margin: 0; color: #6b7280;">
+                    <strong>Account Details:</strong><br>
+                    Email: ${user.email}<br>
+                    Suspension Lifted: ${new Date().toLocaleDateString()}<br>
+                    Status: Active
+                </p>
+            </div>
+            
+            <hr style="margin: 32px 0; border: none; border-top: 1px solid #eee;" />
+            <p style="font-size: 12px; color: #888; text-align: center;">NANA Portal Support Team &copy; 2025</p>
+        </div>
+    `;
+}
+
+// Helper to generate account deleted email
+function getAccountDeletedEmail({ user, deletedBy }) {
+    return `
+        <div style="font-family: Arial, sans-serif; background: #fafafa; padding: 32px; border-radius: 8px; max-width: 520px; margin: auto; border-left: 4px solid #6b7280;">
+            <div style="text-align: center; margin-bottom: 24px;">
+                <h2 style="color: #6b7280; margin: 0;">Account Deleted</h2>
+            </div>
+            <p style="font-size: 16px;">Dear ${user.firstName} ${user.surname},</p>
+            <p style="font-size: 15px;">Your NANA Portal account has been <strong>permanently deleted</strong> by an administrator.</p>
+            
+            <div style="background: #f3f4f6; padding: 16px; border-radius: 4px; margin: 16px 0; border-left: 3px solid #6b7280;">
+                <h4 style="margin: 0 0 8px 0; color: #374151;">Account Deletion Notice</h4>
+                <p style="margin: 0; font-size: 14px;">All your account data and associated information have been removed from our systems.</p>
+            </div>
+            
+            <p style="font-size: 14px;">This action is permanent and cannot be undone.</p>
+            <p style="font-size: 14px;">If you believe this deletion was made in error, please contact our support team immediately.</p>
+            
+            <div style="background: #f9fafb; padding: 16px; border-radius: 4px; margin: 24px 0;">
+                <p style="font-size: 13px; margin: 0; color: #6b7280;">
+                    <strong>Final Account Details:</strong><br>
+                    Email: ${user.email}<br>
+                    Deleted Date: ${new Date().toLocaleDateString()}<br>
+                    Status: Permanently Deleted
+                </p>
+            </div>
+            
+            <hr style="margin: 32px 0; border: none; border-top: 1px solid #eee;" />
+            <p style="font-size: 12px; color: #888; text-align: center;">NANA Portal Support Team &copy; 2025</p>
+        </div>
+    `;
+}

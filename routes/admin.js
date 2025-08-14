@@ -3,12 +3,6 @@ const router = express.Router();
 const { User, Account, Transaction } = require('../models');
 const authenticate = require('../middlewares/auth');
 const isAdmin = require('../middlewares/isAdmin');
-const { 
-  blockUser, 
-  unblockUser, 
-  suspendUser, 
-  getBlockedUsers 
-} = require('../controllers/userController');
 const {
   getAllTransactions,
   getTransactionById,
@@ -18,13 +12,49 @@ const {
   deleteTransaction,
   getTransactionStats,
   bulkOperations
+} = require('../controllers/portalController');
+const {
+  getAllUsers,
+  getUserById,
+  blockUser,
+  unblockUser,
+  suspendUser,
+  unsuspendUser,
+  deleteUser,
+  getUserStats,
+  checkExpiredSuspensions
 } = require('../controllers/adminTransactionController');
 
-// Get all users
-router.get('/users', authenticate, isAdmin, async (req, res) => {
-  const users = await User.findAll({ attributes: { exclude: ['password'] } });
-  res.json(users);
-});
+// ========================================
+// USER MANAGEMENT ROUTES
+// ========================================
+
+// Get all users with filtering and pagination
+router.get('/users', authenticate, isAdmin, getAllUsers);
+
+// Get user statistics
+router.get('/users/stats', authenticate, isAdmin, getUserStats);
+
+// Check and process expired suspensions
+router.post('/users/check-expired-suspensions', authenticate, isAdmin, checkExpiredSuspensions);
+
+// Get specific user by ID
+router.get('/users/:id', authenticate, isAdmin, getUserById);
+
+// Block user
+router.put('/users/:id/block', authenticate, isAdmin, blockUser);
+
+// Unblock user
+router.put('/users/:id/unblock', authenticate, isAdmin, unblockUser);
+
+// Suspend user
+router.put('/users/:id/suspend', authenticate, isAdmin, suspendUser);
+
+// Unsuspend user (lift suspension)
+router.put('/users/:id/unsuspend', authenticate, isAdmin, unsuspendUser);
+
+// Delete user permanently
+router.delete('/users/:id', authenticate, isAdmin, deleteUser);
 
 // Get all accounts
 router.get('/accounts', authenticate, isAdmin, async (req, res) => {
@@ -70,12 +100,6 @@ router.get('/transactions/simple', authenticate, isAdmin, async (req, res) => {
   res.json(transactions);
 });
 
-// Delete a user
-router.delete('/users/:id', authenticate, isAdmin, async (req, res) => {
-  await User.destroy({ where: { id: req.params.id } });
-  res.json({ message: 'User deleted' });
-});
-
 // Delete an account
 router.delete('/accounts/:id', authenticate, isAdmin, async (req, res) => {
   await Account.destroy({ where: { id: req.params.id } });
@@ -88,18 +112,12 @@ router.delete('/transactions/:id/simple', authenticate, isAdmin, async (req, res
   res.json({ message: 'Transaction deleted' });
 });
 
-// Example: Get statistics
+// Example: Get statistics (legacy)
 router.get('/stats', authenticate, isAdmin, async (req, res) => {
   const userCount = await User.count();
   const accountCount = await Account.count();
   const transactionCount = await Transaction.count();
   res.json({ users: userCount, accounts: accountCount, transactions: transactionCount });
 });
-
-// User blocking routes
-router.put('/users/:userId/block', authenticate, isAdmin, blockUser);
-router.put('/users/:userId/unblock', authenticate, isAdmin, unblockUser);
-router.put('/users/:userId/suspend', authenticate, isAdmin, suspendUser);
-router.get('/blocked-users', authenticate, isAdmin, getBlockedUsers);
 
 module.exports = router;

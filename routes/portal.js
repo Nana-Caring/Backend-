@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { portalAdminLogin } = require('../controllers/adminTransactionController');
 const authenticate = require('../middlewares/auth');
 const portalController = require('../controllers/portalController');
 
 // Admin login as user for portal access
-router.post('/admin-login', portalAdminLogin);
+router.post('/admin-login', portalController.portalAdminLogin);
 
 // User portal endpoints
 router.get('/me', authenticate, portalController.getUserDetails);
