@@ -29,7 +29,7 @@ const {
 // USER MANAGEMENT ROUTES
 // ========================================
 
-// Get all users with filtering and pagination
+// Get all users with filtering
 router.get('/users', authenticate, isAdmin, getAllUsers);
 
 // Get user statistics

@@ -12,12 +12,10 @@ const {
     getAccountDeletedEmail 
 } = require('../utils/emailService');
 
-// Get all users with filtering and pagination
+// Get all users with filtering
 const getAllUsers = async (req, res) => {
     try {
         const {
-            page = 1,
-            limit = 20,
             status,
             role,
             search,
@@ -25,7 +23,6 @@ const getAllUsers = async (req, res) => {
             sortOrder = 'DESC'
         } = req.query;
 
-        const offset = (page - 1) * limit;
         const whereClause = {};
 
         // Filter by status
@@ -47,7 +44,7 @@ const getAllUsers = async (req, res) => {
             ];
         }
 
-        const users = await User.findAndCountAll({
+        const users = await User.findAll({
             where: whereClause,
             attributes: [
                 'id', 'firstName', 'middleName', 'surname', 'email', 'role', 'status',
@@ -62,21 +59,14 @@ const getAllUsers = async (req, res) => {
                     attributes: ['id', 'accountNumber', 'accountType', 'balance', 'status']
                 }
             ],
-            order: [[sortBy, sortOrder.toUpperCase()]],
-            limit: parseInt(limit),
-            offset: parseInt(offset)
+            order: [[sortBy, sortOrder.toUpperCase()]]
         });
 
         res.json({
             success: true,
             data: {
-                users: users.rows,
-                pagination: {
-                    page: parseInt(page),
-                    limit: parseInt(limit),
-                    total: users.count,
-                    pages: Math.ceil(users.count / limit)
-                }
+                users: users,
+                total: users.length
             }
         });
 
