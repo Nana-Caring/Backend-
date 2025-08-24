@@ -5,6 +5,7 @@ const Account = require("../models/Account");
 const { Sequelize, Op } = require('sequelize');
 // const generateUniqueAccountNumber = require('../utils/generateUniqueAccountNumber');
 const { generateUniqueAccountNumber } = require('../utils/generateUniqueAccountNumber');
+const { sendMail, getWelcomeEmail } = require('../utils/emailService');
 
 // Register new user (funder or caregiver)
 exports.register = async (req, res) => {
@@ -81,6 +82,25 @@ exports.register = async (req, res) => {
     // Attach account info if funder
     if (account) {
       userResponse.account = account;
+    }
+
+    // Send welcome email with login credentials
+    try {
+      const emailHtml = getWelcomeEmail({ 
+        user: userResponse, 
+        password: password // Send the original password before hashing
+      });
+      
+      await sendMail({
+        to: user.email,
+        subject: 'Welcome to NANA Portal - Your Login Credentials',
+        html: emailHtml
+      });
+      
+      console.log(`Welcome email sent successfully to ${user.email}`);
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+      // Don't fail the registration if email fails
     }
 
     res.status(201).json({ 
@@ -211,13 +231,35 @@ exports.registerDependent = async (req, res) => {
       await mainAccount.save();
     }
 
+    // Prepare response data
+    const dependentResponse = {
+      ...dependent.get({ plain: true }),
+      password: undefined,
+      accounts: [mainAccount, ...subAccounts].map(acc => acc.get ? acc.get({ plain: true }) : acc)
+    };
+
+    // Send welcome email with login credentials
+    try {
+      const emailHtml = getWelcomeEmail({ 
+        user: dependent, 
+        password: password // Send the original password before hashing
+      });
+      
+      await sendMail({
+        to: dependent.email,
+        subject: 'Welcome to NANA Portal - Your Login Credentials',
+        html: emailHtml
+      });
+      
+      console.log(`Welcome email sent successfully to dependent ${dependent.email}`);
+    } catch (emailError) {
+      console.error('Failed to send welcome email to dependent:', emailError);
+      // Don't fail the registration if email fails
+    }
+
     res.status(201).json({
       message: 'Dependent registered successfully',
-      dependent: {
-        ...dependent.get({ plain: true }),
-        password: undefined,
-        accounts: [mainAccount, ...subAccounts].map(acc => acc.get ? acc.get({ plain: true }) : acc)
-      }
+      dependent: dependentResponse
     });
   } catch (error) {
     console.error(error);

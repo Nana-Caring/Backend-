@@ -1,460 +1,415 @@
-// Portal admin login: authenticate as user and issue portal JWT
+// Admin User Management Controller
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { User } = require('../models');
-
-const portalAdminLogin = async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        const user = await User.findOne({ 
-            where: { email: username },
-            attributes: [
-                'id', 'firstName', 'middleName', 'surname', 'email', 
-                'password', 'role', 'createdAt', 'updatedAt'
-            ]
-        });
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-        const valid = await bcrypt.compare(password, user.password);
-        if (!valid) {
-            return res.status(401).json({ message: 'Invalid credentials' });
-        }
-        
-        // Issue a portal JWT scoped for this user with admin privileges
-        const token = jwt.sign({ 
-            id: user.id, 
-            role: 'admin', 
-            portal: true, 
-            originalUserId: user.id 
-        }, process.env.JWT_SECRET, { expiresIn: '2h' });
-        
-        res.json({ 
-            token, 
-            user: {
-                id: user.id,
-                firstName: user.firstName,
-                surname: user.surname,
-                email: user.email,
-                role: user.role,
-                status: user.status || 'active' // Fallback for missing status field
-            }
-        });
-    } catch (error) {
-        console.error('Portal login error:', error);
-        res.status(500).json({ message: 'Server error', error: error.message });
-    }
-};
-const { Transaction, Account, PaymentCard } = require('../models');
+const { User, Account, Transaction } = require('../models');
 const { Op } = require('sequelize');
+const { 
+    sendMail, 
+    getUserBlockedEmail, 
+    getUserSuspendedEmail, 
+    getUserUnblockedEmail, 
+    getUserUnsuspendedEmail, 
+    getAccountDeletedEmail 
+} = require('../utils/emailService');
 
-// Get all transactions with filters and pagination
-const getAllTransactions = async (req, res) => {
+// Get all users with filtering
+const getAllUsers = async (req, res) => {
     try {
         const {
-            page = 1,
-            limit = 20,
-            type,
-            accountId,
-            userId,
-            startDate,
-            endDate,
-            minAmount,
-            maxAmount,
+            status,
+            role,
             search,
             sortBy = 'createdAt',
             sortOrder = 'DESC'
         } = req.query;
 
-        const offset = (page - 1) * limit;
         const whereClause = {};
-        const accountWhereClause = {};
-        const userWhereClause = {};
 
-        // Filter by transaction type
-        if (type) {
-            whereClause.type = type;
+        // Filter by status
+        if (status) {
+            whereClause.status = status;
         }
 
-        // Filter by account ID
-        if (accountId) {
-            whereClause.accountId = accountId;
+        // Filter by role
+        if (role) {
+            whereClause.role = role;
         }
 
-        // Filter by user ID (through account)
-        if (userId) {
-            accountWhereClause.userId = userId;
-        }
-
-        // Filter by date range
-        if (startDate || endDate) {
-            whereClause.createdAt = {};
-            if (startDate) {
-                whereClause.createdAt[Op.gte] = new Date(startDate);
-            }
-            if (endDate) {
-                whereClause.createdAt[Op.lte] = new Date(endDate);
-            }
-        }
-
-        // Filter by amount range
-        if (minAmount || maxAmount) {
-            whereClause.amount = {};
-            if (minAmount) {
-                whereClause.amount[Op.gte] = parseFloat(minAmount);
-            }
-            if (maxAmount) {
-                whereClause.amount[Op.lte] = parseFloat(maxAmount);
-            }
-        }
-
-        // Search in description or reference
+        // Search in name or email
         if (search) {
             whereClause[Op.or] = [
-                { description: { [Op.iLike]: `%${search}%` } },
-                { reference: { [Op.iLike]: `%${search}%` } }
+                { firstName: { [Op.iLike]: `%${search}%` } },
+                { surname: { [Op.iLike]: `%${search}%` } },
+                { email: { [Op.iLike]: `%${search}%` } }
             ];
         }
 
-        const transactions = await Transaction.findAndCountAll({
+        const users = await User.findAll({
             where: whereClause,
+            attributes: [
+                'id', 'firstName', 'middleName', 'surname', 'email', 'role', 'status',
+                'isBlocked', 'blockedAt', 'blockedBy', 'blockReason',
+                'suspendedAt', 'suspendedUntil', 'suspendedBy', 'suspensionReason',
+                'createdAt', 'updatedAt'
+            ],
             include: [
                 {
                     model: Account,
-                    as: 'account',
-                    where: Object.keys(accountWhereClause).length > 0 ? accountWhereClause : undefined,
-                    include: [
-                        {
-                            model: User,
-                            as: 'user',
-                            where: Object.keys(userWhereClause).length > 0 ? userWhereClause : undefined,
-                            attributes: ['id', 'firstName', 'lastName', 'email', 'role']
-                        }
-                    ]
+                    as: 'accounts',
+                    attributes: ['id', 'accountNumber', 'accountType', 'balance', 'status']
                 }
             ],
-            order: [[sortBy, sortOrder.toUpperCase()]],
-            limit: parseInt(limit),
-            offset: parseInt(offset)
+            order: [[sortBy, sortOrder.toUpperCase()]]
         });
 
         res.json({
             success: true,
             data: {
-                transactions: transactions.rows,
-                pagination: {
-                    page: parseInt(page),
-                    limit: parseInt(limit),
-                    total: transactions.count,
-                    pages: Math.ceil(transactions.count / limit)
-                }
+                users: users,
+                total: users.length
             }
         });
 
     } catch (error) {
-        console.error('Error fetching transactions:', error);
+        console.error('Error fetching users:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch transactions',
+            message: 'Failed to fetch users',
             error: error.message
         });
     }
 };
 
-// Get transaction by ID with full details
-const getTransactionById = async (req, res) => {
+// Get user by ID with full details
+const getUserById = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const transaction = await Transaction.findByPk(id, {
+        const user = await User.findByPk(id, {
+            attributes: { exclude: ['password'] },
             include: [
                 {
                     model: Account,
-                    as: 'account',
-                    include: [
-                        {
-                            model: User,
-                            as: 'user',
-                            attributes: ['id', 'firstName', 'lastName', 'email', 'role', 'idNumber']
-                        }
-                    ]
+                    as: 'accounts',
+                    attributes: ['id', 'accountNumber', 'accountType', 'balance', 'currency', 'status']
                 }
             ]
         });
 
-        if (!transaction) {
+        if (!user) {
             return res.status(404).json({
                 success: false,
-                message: 'Transaction not found'
+                message: 'User not found'
             });
         }
 
         res.json({
             success: true,
-            data: transaction
+            data: user
         });
 
     } catch (error) {
-        console.error('Error fetching transaction:', error);
+        console.error('Error fetching user:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch transaction',
+            message: 'Failed to fetch user',
             error: error.message
         });
     }
 };
 
-// Create manual transaction (admin only)
-const createManualTransaction = async (req, res) => {
-    try {
-        const {
-            accountId,
-            amount,
-            type,
-            description,
-            reference,
-            metadata
-        } = req.body;
-
-        // Validate required fields
-        if (!accountId || !amount || !type) {
-            return res.status(400).json({
-                success: false,
-                message: 'Account ID, amount, and type are required'
-            });
-        }
-
-        // Validate transaction type
-        if (!['Credit', 'Debit'].includes(type)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Transaction type must be Credit or Debit'
-            });
-        }
-
-        // Check if account exists
-        const account = await Account.findByPk(accountId);
-        if (!account) {
-            return res.status(404).json({
-                success: false,
-                message: 'Account not found'
-            });
-        }
-
-        // Create transaction
-        const transaction = await Transaction.create({
-            accountId,
-            amount: parseFloat(amount),
-            type,
-            description: description || `Manual ${type.toLowerCase()} by admin`,
-            reference: reference || `admin-${Date.now()}`,
-            metadata: {
-                ...metadata,
-                source: 'admin_manual',
-                adminId: req.user.id,
-                adminEmail: req.user.email,
-                createdAt: new Date().toISOString()
-            }
-        });
-
-        // Update account balance
-        if (type === 'Credit') {
-            await account.increment('balance', { by: parseFloat(amount) });
-        } else {
-            await account.decrement('balance', { by: parseFloat(amount) });
-        }
-
-        // Fetch the created transaction with account details
-        const createdTransaction = await Transaction.findByPk(transaction.id, {
-            include: [
-                {
-                    model: Account,
-                    as: 'account',
-                    include: [
-                        {
-                            model: User,
-                            as: 'user',
-                            attributes: ['id', 'firstName', 'lastName', 'email']
-                        }
-                    ]
-                }
-            ]
-        });
-
-        res.status(201).json({
-            success: true,
-            message: 'Manual transaction created successfully',
-            data: createdTransaction
-        });
-
-    } catch (error) {
-        console.error('Error creating manual transaction:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to create manual transaction',
-            error: error.message
-        });
-    }
-};
-
-// Update transaction (limited fields)
-const updateTransaction = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { description, metadata } = req.body;
-
-        const transaction = await Transaction.findByPk(id);
-        if (!transaction) {
-            return res.status(404).json({
-                success: false,
-                message: 'Transaction not found'
-            });
-        }
-
-        // Only allow updating description and metadata for safety
-        const updateData = {};
-        if (description !== undefined) {
-            updateData.description = description;
-        }
-        if (metadata !== undefined) {
-            updateData.metadata = {
-                ...transaction.metadata,
-                ...metadata,
-                lastModified: new Date().toISOString(),
-                modifiedBy: req.user.id
-            };
-        }
-
-        await transaction.update(updateData);
-
-        // Fetch updated transaction with details
-        const updatedTransaction = await Transaction.findByPk(id, {
-            include: [
-                {
-                    model: Account,
-                    as: 'account',
-                    include: [
-                        {
-                            model: User,
-                            as: 'user',
-                            attributes: ['id', 'firstName', 'lastName', 'email']
-                        }
-                    ]
-                }
-            ]
-        });
-
-        res.json({
-            success: true,
-            message: 'Transaction updated successfully',
-            data: updatedTransaction
-        });
-
-    } catch (error) {
-        console.error('Error updating transaction:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to update transaction',
-            error: error.message
-        });
-    }
-};
-
-// Reverse/void transaction (creates opposing transaction)
-const reverseTransaction = async (req, res) => {
+// Block user
+const blockUser = async (req, res) => {
     try {
         const { id } = req.params;
         const { reason } = req.body;
+        const adminId = req.user.id;
 
-        const originalTransaction = await Transaction.findByPk(id, {
-            include: [{ model: Account, as: 'account' }]
-        });
-
-        if (!originalTransaction) {
+        const user = await User.findByPk(id);
+        if (!user) {
             return res.status(404).json({
                 success: false,
-                message: 'Transaction not found'
+                message: 'User not found'
             });
         }
 
-        // Check if already reversed
-        const existingReversal = await Transaction.findOne({
-            where: {
-                reference: `reversal-${id}`,
-                metadata: {
-                    originalTransactionId: id
-                }
-            }
-        });
-
-        if (existingReversal) {
+        if (user.status === 'blocked') {
             return res.status(400).json({
                 success: false,
-                message: 'Transaction has already been reversed'
+                message: 'User is already blocked'
             });
         }
 
-        // Create reversal transaction
-        const reversalType = originalTransaction.type === 'Credit' ? 'Debit' : 'Credit';
-        const reversalTransaction = await Transaction.create({
-            accountId: originalTransaction.accountId,
-            amount: originalTransaction.amount,
-            type: reversalType,
-            description: `Reversal of transaction: ${originalTransaction.description}`,
-            reference: `reversal-${id}`,
-            metadata: {
-                isReversal: true,
-                originalTransactionId: id,
-                originalReference: originalTransaction.reference,
-                reason: reason || 'Admin reversal',
-                reversedBy: req.user.id,
-                reversedAt: new Date().toISOString()
-            }
+        // Update user status
+        await user.update({
+            status: 'blocked',
+            isBlocked: true,
+            blockedAt: new Date(),
+            blockedBy: adminId,
+            blockReason: reason || 'No reason provided'
         });
 
-        // Update account balance
-        if (reversalType === 'Credit') {
-            await originalTransaction.account.increment('balance', { by: originalTransaction.amount });
-        } else {
-            await originalTransaction.account.decrement('balance', { by: originalTransaction.amount });
+        // Send notification email
+        try {
+            const emailHtml = getUserBlockedEmail({
+                user,
+                reason: reason || 'No reason provided',
+                blockedBy: adminId
+            });
+
+            await sendMail({
+                to: user.email,
+                subject: 'NANA Portal - Account Blocked',
+                html: emailHtml
+            });
+
+            console.log(`Block notification sent to ${user.email}`);
+        } catch (emailError) {
+            console.error('Failed to send block notification:', emailError);
         }
-
-        // Mark original transaction as reversed
-        await originalTransaction.update({
-            metadata: {
-                ...originalTransaction.metadata,
-                isReversed: true,
-                reversalTransactionId: reversalTransaction.id,
-                reversedBy: req.user.id,
-                reversedAt: new Date().toISOString(),
-                reversalReason: reason
-            }
-        });
 
         res.json({
             success: true,
-            message: 'Transaction reversed successfully',
+            message: 'User blocked successfully',
             data: {
-                originalTransaction,
-                reversalTransaction
+                userId: user.id,
+                email: user.email,
+                status: 'blocked',
+                blockedAt: user.blockedAt,
+                reason: user.blockReason
             }
         });
 
     } catch (error) {
-        console.error('Error reversing transaction:', error);
+        console.error('Error blocking user:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to reverse transaction',
+            message: 'Failed to block user',
             error: error.message
         });
     }
 };
 
-// Delete transaction (hard delete - use with caution)
-const deleteTransaction = async (req, res) => {
+// Unblock user
+const unblockUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const { confirmDelete, adjustBalance = true } = req.body;
+
+        const user = await User.findByPk(id);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        if (user.status !== 'blocked') {
+            return res.status(400).json({
+                success: false,
+                message: 'User is not blocked'
+            });
+        }
+
+        // Update user status
+        await user.update({
+            status: 'active',
+            isBlocked: false,
+            blockedAt: null,
+            blockedBy: null,
+            blockReason: null
+        });
+
+        // Send notification email
+        try {
+            const emailHtml = getUserUnblockedEmail({ user });
+
+            await sendMail({
+                to: user.email,
+                subject: 'NANA Portal - Account Reactivated',
+                html: emailHtml
+            });
+
+            console.log(`Unblock notification sent to ${user.email}`);
+        } catch (emailError) {
+            console.error('Failed to send unblock notification:', emailError);
+        }
+
+        res.json({
+            success: true,
+            message: 'User unblocked successfully',
+            data: {
+                userId: user.id,
+                email: user.email,
+                status: 'active'
+            }
+        });
+
+    } catch (error) {
+        console.error('Error unblocking user:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to unblock user',
+            error: error.message
+        });
+    }
+};
+
+// Suspend user for a specific period
+const suspendUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason, suspensionDays } = req.body;
+        const adminId = req.user.id;
+
+        if (!suspensionDays || suspensionDays <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Suspension days must be a positive number'
+            });
+        }
+
+        const user = await User.findByPk(id);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        if (user.status === 'suspended') {
+            return res.status(400).json({
+                success: false,
+                message: 'User is already suspended'
+            });
+        }
+
+        // Calculate suspension end date
+        const suspendedUntil = new Date();
+        suspendedUntil.setDate(suspendedUntil.getDate() + parseInt(suspensionDays));
+
+        // Update user status
+        await user.update({
+            status: 'suspended',
+            suspendedAt: new Date(),
+            suspendedUntil,
+            suspendedBy: adminId,
+            suspensionReason: reason || 'No reason provided'
+        });
+
+        // Send notification email
+        try {
+            const emailHtml = getUserSuspendedEmail({
+                user,
+                reason: reason || 'No reason provided',
+                suspendedUntil,
+                suspendedBy: adminId
+            });
+
+            await sendMail({
+                to: user.email,
+                subject: 'NANA Portal - Account Suspended',
+                html: emailHtml
+            });
+
+            console.log(`Suspension notification sent to ${user.email}`);
+        } catch (emailError) {
+            console.error('Failed to send suspension notification:', emailError);
+        }
+
+        res.json({
+            success: true,
+            message: 'User suspended successfully',
+            data: {
+                userId: user.id,
+                email: user.email,
+                status: 'suspended',
+                suspendedAt: user.suspendedAt,
+                suspendedUntil: user.suspendedUntil,
+                suspensionDays: parseInt(suspensionDays),
+                reason: user.suspensionReason
+            }
+        });
+
+    } catch (error) {
+        console.error('Error suspending user:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to suspend user',
+            error: error.message
+        });
+    }
+};
+
+// Unsuspend user (lift suspension early)
+const unsuspendUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const user = await User.findByPk(id);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        if (user.status !== 'suspended') {
+            return res.status(400).json({
+                success: false,
+                message: 'User is not suspended'
+            });
+        }
+
+        // Update user status
+        await user.update({
+            status: 'active',
+            suspendedAt: null,
+            suspendedUntil: null,
+            suspendedBy: null,
+            suspensionReason: null
+        });
+
+        // Send notification email
+        try {
+            const emailHtml = getUserUnsuspendedEmail({ user });
+
+            await sendMail({
+                to: user.email,
+                subject: 'NANA Portal - Suspension Lifted',
+                html: emailHtml
+            });
+
+            console.log(`Unsuspension notification sent to ${user.email}`);
+        } catch (emailError) {
+            console.error('Failed to send unsuspension notification:', emailError);
+        }
+
+        res.json({
+            success: true,
+            message: 'User suspension lifted successfully',
+            data: {
+                userId: user.id,
+                email: user.email,
+                status: 'active'
+            }
+        });
+
+    } catch (error) {
+        console.error('Error lifting user suspension:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to lift user suspension',
+            error: error.message
+        });
+    }
+};
+
+// Delete user permanently
+const deleteUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { confirmDelete, deleteData = true } = req.body;
+        const adminId = req.user.id;
 
         if (!confirmDelete) {
             return res.status(400).json({
@@ -463,261 +418,210 @@ const deleteTransaction = async (req, res) => {
             });
         }
 
-        const transaction = await Transaction.findByPk(id, {
-            include: [{ model: Account, as: 'account' }]
+        const user = await User.findByPk(id, {
+            include: [
+                {
+                    model: Account,
+                    as: 'accounts'
+                }
+            ]
         });
 
-        if (!transaction) {
+        if (!user) {
             return res.status(404).json({
                 success: false,
-                message: 'Transaction not found'
+                message: 'User not found'
             });
         }
 
-        // Optionally adjust account balance before deletion
-        if (adjustBalance) {
-            if (transaction.type === 'Credit') {
-                await transaction.account.decrement('balance', { by: transaction.amount });
-            } else {
-                await transaction.account.increment('balance', { by: transaction.amount });
-            }
-        }
-
-        // Store transaction details for response
-        const deletedTransactionData = {
-            id: transaction.id,
-            accountId: transaction.accountId,
-            amount: transaction.amount,
-            type: transaction.type,
-            description: transaction.description,
-            reference: transaction.reference
+        // Store user data for email before deletion
+        const userData = {
+            id: user.id,
+            firstName: user.firstName,
+            surname: user.surname,
+            email: user.email,
+            role: user.role
         };
 
-        // Delete transaction
-        await transaction.destroy();
+        // Send deletion notification email before deleting
+        try {
+            const emailHtml = getAccountDeletedEmail({
+                user: userData,
+                deletedBy: adminId
+            });
+
+            await sendMail({
+                to: user.email,
+                subject: 'NANA Portal - Account Deleted',
+                html: emailHtml
+            });
+
+            console.log(`Deletion notification sent to ${user.email}`);
+        } catch (emailError) {
+            console.error('Failed to send deletion notification:', emailError);
+        }
+
+        // Delete related data if requested
+        if (deleteData) {
+            // Delete transactions related to user's accounts
+            const accountIds = user.accounts.map(acc => acc.id);
+            if (accountIds.length > 0) {
+                await Transaction.destroy({
+                    where: { accountId: { [Op.in]: accountIds } }
+                });
+            }
+
+            // Delete user's accounts
+            await Account.destroy({
+                where: { userId: user.id }
+            });
+        }
+
+        // Delete the user
+        await user.destroy();
 
         res.json({
             success: true,
-            message: 'Transaction deleted successfully',
+            message: 'User deleted successfully',
             data: {
-                deletedTransaction: deletedTransactionData,
-                balanceAdjusted: adjustBalance
+                deletedUser: userData,
+                dataDeleted: deleteData,
+                deletedAt: new Date().toISOString()
             }
         });
 
     } catch (error) {
-        console.error('Error deleting transaction:', error);
+        console.error('Error deleting user:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to delete transaction',
+            message: 'Failed to delete user',
             error: error.message
         });
     }
 };
 
-// Get transaction statistics
-const getTransactionStats = async (req, res) => {
+// Get user statistics
+const getUserStats = async (req, res) => {
     try {
-        const { startDate, endDate, accountId, userId } = req.query;
+        const totalUsers = await User.count();
+        const activeUsers = await User.count({ where: { status: 'active' } });
+        const blockedUsers = await User.count({ where: { status: 'blocked' } });
+        const suspendedUsers = await User.count({ where: { status: 'suspended' } });
+        const pendingUsers = await User.count({ where: { status: 'pending' } });
 
-        const whereClause = {};
-        const accountWhereClause = {};
+        // Users by role
+        const funderCount = await User.count({ where: { role: 'funder' } });
+        const caregiverCount = await User.count({ where: { role: 'caregiver' } });
+        const dependentCount = await User.count({ where: { role: 'dependent' } });
 
-        // Filter by date range
-        if (startDate || endDate) {
-            whereClause.createdAt = {};
-            if (startDate) {
-                whereClause.createdAt[Op.gte] = new Date(startDate);
-            }
-            if (endDate) {
-                whereClause.createdAt[Op.lte] = new Date(endDate);
-            }
-        }
-
-        // Filter by account
-        if (accountId) {
-            whereClause.accountId = accountId;
-        }
-
-        // Filter by user (through account)
-        if (userId) {
-            accountWhereClause.userId = userId;
-        }
-
-        const includeAccount = Object.keys(accountWhereClause).length > 0 
-            ? [{ model: Account, as: 'account', where: accountWhereClause }]
-            : [];
-
-        // Get basic stats
-        const totalTransactions = await Transaction.count({
-            where: whereClause,
-            include: includeAccount
-        });
-
-        const creditTransactions = await Transaction.count({
-            where: { ...whereClause, type: 'Credit' },
-            include: includeAccount
-        });
-
-        const debitTransactions = await Transaction.count({
-            where: { ...whereClause, type: 'Debit' },
-            include: includeAccount
-        });
-
-        // Get amount stats
-        const creditSum = await Transaction.sum('amount', {
-            where: { ...whereClause, type: 'Credit' },
-            include: includeAccount
-        }) || 0;
-
-        const debitSum = await Transaction.sum('amount', {
-            where: { ...whereClause, type: 'Debit' },
-            include: includeAccount
-        }) || 0;
-
-        const avgTransactionAmount = await Transaction.findOne({
-            attributes: [
-                [Transaction.sequelize.fn('AVG', Transaction.sequelize.col('amount')), 'avgAmount']
-            ],
-            where: whereClause,
-            include: includeAccount,
-            raw: true
-        });
-
-        // Get daily transaction counts for the last 30 days
+        // Recent registrations (last 30 days)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-        const dailyStats = await Transaction.findAll({
-            attributes: [
-                [Transaction.sequelize.fn('DATE', Transaction.sequelize.col('createdAt')), 'date'],
-                [Transaction.sequelize.fn('COUNT', '*'), 'count'],
-                [Transaction.sequelize.fn('SUM', Transaction.sequelize.col('amount')), 'totalAmount']
-            ],
+        const recentRegistrations = await User.count({
             where: {
-                ...whereClause,
                 createdAt: {
                     [Op.gte]: thirtyDaysAgo
                 }
-            },
-            include: includeAccount,
-            group: [Transaction.sequelize.fn('DATE', Transaction.sequelize.col('createdAt'))],
-            order: [[Transaction.sequelize.fn('DATE', Transaction.sequelize.col('createdAt')), 'ASC']],
-            raw: true
+            }
         });
 
         res.json({
             success: true,
             data: {
-                summary: {
-                    totalTransactions,
-                    creditTransactions,
-                    debitTransactions,
-                    totalCreditAmount: creditSum,
-                    totalDebitAmount: debitSum,
-                    netAmount: creditSum - debitSum,
-                    averageTransactionAmount: parseFloat(avgTransactionAmount?.avgAmount || 0).toFixed(2)
+                totals: {
+                    totalUsers,
+                    activeUsers,
+                    blockedUsers,
+                    suspendedUsers,
+                    pendingUsers
                 },
-                dailyStats,
-                period: {
-                    startDate: startDate || thirtyDaysAgo.toISOString().split('T')[0],
-                    endDate: endDate || new Date().toISOString().split('T')[0]
+                byRole: {
+                    funders: funderCount,
+                    caregivers: caregiverCount,
+                    dependents: dependentCount
+                },
+                recent: {
+                    last30Days: recentRegistrations
                 }
             }
         });
 
-    } catch (error) {
-        console.error('Error fetching transaction stats:', error);
+    } catch (error) { 
+        console.error('Error fetching user stats:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch transaction statistics',
+            message: 'Failed to fetch user statistics',
             error: error.message
         });
     }
 };
 
-// Bulk operations
-const bulkOperations = async (req, res) => {
+// Check and auto-unsuspend users whose suspension has expired
+const checkExpiredSuspensions = async (req, res) => {
     try {
-        const { operation, transactionIds, data } = req.body;
+        const now = new Date();
+        const expiredSuspensions = await User.findAll({
+            where: {
+                status: 'suspended',
+                suspendedUntil: {
+                    [Op.lte]: now
+                }
+            }
+        });
 
-        if (!operation || !transactionIds || !Array.isArray(transactionIds)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Operation and transaction IDs array are required'
+        for (const user of expiredSuspensions) {
+            await user.update({
+                status: 'active',
+                suspendedAt: null,
+                suspendedUntil: null,
+                suspendedBy: null,
+                suspensionReason: null
             });
-        }
 
-        let results = [];
-
-        switch (operation) {
-            case 'delete':
-                if (!data?.confirmDelete) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'Delete confirmation required'
-                    });
-                }
-
-                const deletedCount = await Transaction.destroy({
-                    where: { id: { [Op.in]: transactionIds } }
+            // Send notification email
+            try {
+                const emailHtml = getUserUnsuspendedEmail({ user });
+                await sendMail({
+                    to: user.email,
+                    subject: 'NANA Portal - Suspension Period Ended',
+                    html: emailHtml
                 });
-
-                results = { deletedCount };
-                break;
-
-            case 'updateDescription':
-                if (!data?.description) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'Description is required for update operation'
-                    });
-                }
-
-                const [updatedCount] = await Transaction.update(
-                    { 
-                        description: data.description,
-                        metadata: Transaction.sequelize.literal(`
-                            COALESCE(metadata, '{}') || '{"bulkUpdated": true, "updatedBy": "${req.user.id}", "updatedAt": "${new Date().toISOString()}"}'
-                        `)
-                    },
-                    { where: { id: { [Op.in]: transactionIds } } }
-                );
-
-                results = { updatedCount };
-                break;
-
-            default:
-                return res.status(400).json({
-                    success: false,
-                    message: 'Invalid operation. Supported: delete, updateDescription'
-                });
+            } catch (emailError) {
+                console.error(`Failed to send auto-unsuspension notification to ${user.email}:`, emailError);
+            }
         }
 
         res.json({
             success: true,
-            message: `Bulk ${operation} completed successfully`,
-            data: results
+            message: `${expiredSuspensions.length} expired suspensions processed`,
+            data: {
+                processedUsers: expiredSuspensions.length,
+                users: expiredSuspensions.map(u => ({
+                    id: u.id,
+                    email: u.email,
+                    previousSuspensionEnd: u.suspendedUntil
+                }))
+            }
         });
 
     } catch (error) {
-        console.error('Error performing bulk operation:', error);
+        console.error('Error checking expired suspensions:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to perform bulk operation',
+            message: 'Failed to check expired suspensions',
             error: error.message
         });
     }
 };
 
 module.exports = {
-    portalAdminLogin,
-    getAllTransactions,
-    getTransactionById,
-    createManualTransaction,
-    updateTransaction,
-    reverseTransaction,
-    deleteTransaction,
-    getTransactionStats,
-    bulkOperations
+    getAllUsers,
+    getUserById,
+    blockUser,
+    unblockUser,
+    suspendUser,
+    unsuspendUser,
+    deleteUser,
+    getUserStats,
+    checkExpiredSuspensions
 };

@@ -72,6 +72,31 @@ const User = sequelize.define('User', {
     allowNull: false,
     defaultValue: 'active'
   },
+  // Suspension fields
+  suspendedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: 'When the user was suspended'
+  },
+  suspendedUntil: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: 'When the suspension expires'
+  },
+  suspendedBy: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'Users',
+      key: 'id'
+    },
+    comment: 'ID of admin who suspended the user'
+  },
+  suspensionReason: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    comment: 'Reason for suspension'
+  },
   // Personal details - these remain null until user explicitly edits them
   phoneNumber: {
     type: DataTypes.STRING(15),
