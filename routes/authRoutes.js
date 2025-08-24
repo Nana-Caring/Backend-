@@ -60,7 +60,6 @@ const forgotPasswordLimiter = rateLimit({
 });
 
 // Forgot Password (REQUIRES EMAIL SERVICE)
-/*
 router.post(
   "/forgot-password",
   forgotPasswordLimiter, // Apply rate limiting here
@@ -110,9 +109,10 @@ router.post(
     }
   }
 );
-*/
+
 
 // TESTING ENDPOINT: Forgot Password with Token Response (FOR DEVELOPMENT ONLY)
+/* 
 router.post(
   "/forgot-password",
   [
@@ -156,6 +156,7 @@ router.post(
     }
   }
 );
+*/
 
 // Reset Password 
 router.post(
