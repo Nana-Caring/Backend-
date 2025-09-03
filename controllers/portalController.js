@@ -243,8 +243,11 @@ exports.portalAdminLogin = async (req, res) => {
             originalUserId: user.id 
         }, process.env.JWT_SECRET, { expiresIn: '2h' });
         
+        // Log the complete token for debugging
+        console.log('Generated token:', token);
+        
         res.json({ 
-            token, 
+            token: token.trim(), // Ensure no whitespace
             user: {
                 id: user.id,
                 firstName: user.firstName,
