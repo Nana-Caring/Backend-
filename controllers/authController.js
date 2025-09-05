@@ -494,28 +494,49 @@ exports.forgotPassword = async (req, res) => {
     
     if (!user) {
       // Don't reveal if email exists or not for security
-      return res.status(200).json({ 
-        message: 'If that email address is in our system, we have sent you an email with instructions to reset your password.' 
-      });
+        return res.status(200).json({ 
+          message: 'If that email address is in our system, we have sent you an email with instructions to reset your password.',
+          email: email,
+          user: null
+        });
     }
 
     // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
     
-    // Set token and expiration (15 minutes to match login token expiration)
-    const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    // Set token and expiration (15 minutes)
+    const resetTokenExpiry = Date.now() + 15 * 60 * 1000; // 15 minutes
     
     // Update user with reset token
     await user.update({
-      resetPasswordToken: resetToken,
-      resetPasswordExpires: resetTokenExpiry
+      resetToken: resetToken,
+      resetTokenExpires: resetTokenExpiry
     });
 
-    // Return token for frontend to handle (in development/testing)
-    // In production, you would send this via email
+    // Send password reset email
+    try {
+      const { sendMail, getPasswordResetEmail } = require('../utils/emailService');
+      
+      // Create reset URL - point to frontend reset password page
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const resetUrl = `${frontendUrl}/reset-password/${resetToken}?email=${encodeURIComponent(email)}`;
+      
+      const emailHtml = getPasswordResetEmail({ user, resetUrl });
+      
+      await sendMail({
+        to: email,
+        subject: 'NANA Portal - Password Reset Request',
+        html: emailHtml
+      });
+
+      console.log(`Password reset email sent to: ${email}`);
+    } catch (emailError) {
+      console.error('Failed to send reset email:', emailError);
+      // Don't fail the request if email fails - still return success for security
+    }
+
     res.status(200).json({ 
-      message: 'Password reset token generated successfully.',
-      token: resetToken // Frontend can use this for testing
+      message: 'If that email address is in our system, we have sent you an email with instructions to reset your password.'
     });
 
   } catch (error) {
@@ -524,31 +545,66 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
-// Reset Password
-exports.resetPassword = async (req, res) => {
+// Verify Reset Token
+exports.verifyResetToken = async (req, res) => {
   try {
-    const { newPassword } = req.body;
-    
-    // Extract token from Authorization header (Bearer token)
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.startsWith('Bearer ') 
-      ? authHeader.substring(7) // Remove 'Bearer ' prefix
-      : null;
+    const { token, email } = req.body;
 
-    if (!token || !newPassword) {
-      return res.status(400).json({ message: 'Authorization token and new password are required' });
-    }
-
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+    if (!token || !email) {
+      return res.status(400).json({ message: 'Token and email are required' });
     }
 
     // Find user with valid reset token
     const user = await User.findOne({
       where: {
-        resetPasswordToken: token,
-        resetPasswordExpires: {
-          [Op.gt]: new Date() // Token hasn't expired
+        email: email,
+        resetToken: token,
+        resetTokenExpires: {
+          [Op.gt]: Date.now() // Token hasn't expired
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(400).json({ 
+        message: 'Invalid or expired reset token',
+        valid: false 
+      });
+    }
+
+    res.status(200).json({ 
+      message: 'Token is valid',
+      valid: true,
+      email: user.email,
+      firstName: user.firstName
+    });
+
+  } catch (error) {
+    console.error('Verify reset token error:', error);
+    res.status(500).json({ message: 'Server error. Please try again later.' });
+  }
+};
+
+// Reset Password
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, email, newPassword } = req.body;
+
+    if (!token || !email || !newPassword) {
+      return res.status(400).json({ message: 'Token, email, and new password are required' });
+    }
+
+    if (newPassword.length < 10) {
+      return res.status(400).json({ message: 'Password must be at least 10 characters long' });
+    }
+
+    // Find user with valid reset token
+    const user = await User.findOne({
+      where: {
+        email: email,
+        resetToken: token,
+        resetTokenExpires: {
+          [Op.gt]: Date.now() // Token hasn't expired
         }
       }
     });
@@ -560,16 +616,47 @@ exports.resetPassword = async (req, res) => {
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update user password and clear reset token
-    await user.update({
-      password: hashedPassword,
-      resetPasswordToken: null,
-      resetPasswordExpires: null
-    });
+    // Update user password and clear reset token (single-use token)
+      await user.update({
+        password: hashedPassword,
+        resetToken: null,
+        resetTokenExpires: null
+      });
 
-    res.status(200).json({ 
-      message: 'Password has been reset successfully. You can now log in with your new password.' 
-    });
+    // Send password reset success email
+    try {
+      const { sendMail, getPasswordResetSuccessEmail } = require('../utils/emailService');
+      
+      const emailHtml = getPasswordResetSuccessEmail({ user });
+      
+      await sendMail({
+        to: email,
+        subject: 'NANA Portal - Password Reset Successful',
+        html: emailHtml
+      });
+
+      console.log(`Password reset success email sent to: ${email}`);
+    } catch (emailError) {
+      console.error('Failed to send success email:', emailError);
+      // Don't fail the request if email fails
+    }
+
+      res.status(200).json({ 
+        message: 'Password has been reset successfully.',
+        email: user.email,
+        user: {
+          id: user.id,
+          firstName: user.firstName,
+          middleName: user.middleName,
+          surname: user.surname,
+          email: user.email,
+          role: user.role,
+          Idnumber: user.Idnumber,
+          relation: user.relation,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt
+        }
+      });
 
   } catch (error) {
     console.error('Reset password error:', error);
