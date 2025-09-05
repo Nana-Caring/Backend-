@@ -518,7 +518,7 @@ exports.forgotPassword = async (req, res) => {
       const { sendMail, getPasswordResetEmail } = require('../utils/emailService');
       
       // Create reset URL - point to frontend reset password page
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
   const resetUrl = `${frontendUrl}/reset-password/${resetToken}?email=${encodeURIComponent(email)}`;
       
       const emailHtml = getPasswordResetEmail({ user, resetUrl });
