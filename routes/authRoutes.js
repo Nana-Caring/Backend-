@@ -1,6 +1,6 @@
 const express = require("express");
 const { check } = require("express-validator");
-const { register, login, getUser, registerDependent, adminLogin } = require("../controllers/authController");
+const { register, login, getUser, registerDependent, adminLogin, verifyResetToken } = require("../controllers/authController");
 const authMiddleware = require("../middlewares/auth");
 const rateLimit = require('express-rate-limit');
 
@@ -148,6 +148,9 @@ router.post(
     }
   }
 );
+
+// Verify Reset Token
+router.post("/verify-reset-token", verifyResetToken);
 
 module.exports = router;
 
