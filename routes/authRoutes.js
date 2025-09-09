@@ -1,7 +1,8 @@
 const express = require("express");
 const { check, validationResult } = require("express-validator");
 const rateLimit = require("express-rate-limit");
-const { register, login, getUser, registerDependent,authMiddleware, adminLogin, verifyResetToken } = require("../controllers/authController");
+const { register, login, getUser, registerDependent, adminLogin, verifyResetToken } = require("../controllers/authController");
+const authMiddleware = require("../middlewares/auth");
 
 
 const router = express.Router();
@@ -51,13 +52,28 @@ router.post(
 // GET CURRENT USER
 router.get("/me", authMiddleware, getUser);
 
-// Forgot Password 
+// Rate limiting middleware for password reset requests
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 3, // Only 3 reset requests per email per 15 minutes
+  message: 'Too many password reset attempts, try again later.',
+  keyGenerator: (req) => req.body.email || req.ip
+});
+
+// Forgot Password (REQUIRES EMAIL SERVICE)
 router.post(
   "/forgot-password",
+  forgotPasswordLimiter, // Apply rate limiting here
   [
     check("email", "Include a valid email").isEmail(),
   ],
   async (req, res) => {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
     const { email } = req.body;
     
     try {
@@ -95,13 +111,53 @@ router.post(
   }
 );
 
-// Rate limiting middleware for password reset
-const forgotPasswordLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3, // Only 3 reset requests per email per 15 minutes
-  message: 'Too many password reset attempts, try again later.',
-  keyGenerator: (req) => req.body.email || req.ip
-});
+
+// TESTING ENDPOINT: Forgot Password with Token Response (FOR DEVELOPMENT ONLY)
+/* 
+router.post(
+  "/forgot-password",
+  [
+    check("email", "Include a valid email").isEmail(),
+  ],
+  async (req, res) => {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { email } = req.body;
+    
+    try {
+      const User = require("../models/User");
+      const user = await User.findOne({ where: { email } });
+      
+      if (!user) {
+        return res.status(404).json({ message: 'User not found.' });
+      }
+
+      // Generate secure token
+      const crypto = require('crypto');
+      const token = crypto.randomBytes(32).toString('hex');
+      const expires = Date.now() + 1000 * 60 * 10; // 10 minutes expiration
+
+      await user.update({ resetToken: token, resetTokenExpires: expires });
+
+      // For testing: return token directly instead of sending email
+      res.json({ 
+        message: 'Reset token generated successfully.',
+        token: token,
+        email: email,
+        expiresAt: new Date(expires).toISOString(),
+        note: 'This endpoint is for testing only. Use /forgot-password for production.'
+      });
+    } catch (error) {
+      console.error('Forgot password test error:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+);
+*/
 
 // Reset Password 
 router.post(
@@ -109,10 +165,15 @@ router.post(
   [
     check("email", "Include a valid email").isEmail(),
     check("token", "Reset token is required").not().isEmpty(),
-    check("newPassword", "Password must be at least 10 characters").isLength({ min: 6 }),
+    check("newPassword", "Password must be at least 6 characters").isLength({ min: 6 }),
   ],
-  forgotPasswordLimiter, // Apply rate limiting
   async (req, res) => {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
     const { email, token, newPassword } = req.body;
 
     try {
