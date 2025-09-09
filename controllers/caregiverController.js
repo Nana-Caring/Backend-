@@ -260,7 +260,7 @@ const getCaregiverStats = async (req, res) => {
             where: { role: 'dependent' },
             include: [
                 {
-                    model: Account,
+                    model: Account, 
                     as: 'accounts',
                     where: { caregiverId: caregiverId },
                     required: true
