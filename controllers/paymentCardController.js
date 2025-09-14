@@ -446,25 +446,48 @@ const createPaymentIntentWithCard = async (req, res) => {
       });
     }
 
-    // Create payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // Convert to cents
-      currency: 'zar',
-      customer: user.stripeCustomerId,
-      payment_method: card.stripePaymentMethodId,
-      confirm: false, // frontend will confirm
-      description: description || 'Payment via NANA platform',
-      metadata: {
-        userId: userId.toString(),
-        cardId: String(cardId)
-      }
-    });
+    // Check if this is a test card (mock payment method)
+    const isTestCard = card.stripePaymentMethodId.startsWith('pm_test_');
+    
+    let paymentIntent;
+    
+    if (isTestCard) {
+      // For test cards, create payment intent without payment method
+      // The frontend will need to collect payment method separately
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: 'zar',
+        customer: user.stripeCustomerId,
+        // Don't specify payment_method for test cards
+        description: description || 'Payment via NANA platform (Test Mode)',
+        metadata: {
+          userId: userId.toString(),
+          cardId: String(cardId),
+          testMode: 'true'
+        }
+      });
+    } else {
+      // For real Stripe payment methods
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: 'zar',
+        customer: user.stripeCustomerId,
+        payment_method: card.stripePaymentMethodId,
+        confirm: false, // frontend will confirm
+        description: description || 'Payment via NANA platform',
+        metadata: {
+          userId: userId.toString(),
+          cardId: String(cardId)
+        }
+      });
+    }
 
     res.json({
       message: 'Payment intent created successfully',
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
       amount: amount,
+      testMode: isTestCard,
       card: {
         bankName: card.bankName,
         cardNumber: maskCardNumber(card.cardNumber)
@@ -545,8 +568,41 @@ const addPaymentCardTest = async (req, res) => {
       );
     }
 
-    // Create a mock Stripe payment method ID for testing
-    const mockStripePaymentMethodId = `pm_test_${Date.now()}_${lastFourDigits}`;
+    // Create a real Stripe payment method for testing using test card numbers
+    let stripePaymentMethodId = null;
+    
+    try {
+      // Get or create Stripe customer for the user
+      const user = await User.findByPk(userId);
+      if (!user.stripeCustomerId) {
+        const customerId = await createStripeCustomer(user);
+        user.stripeCustomerId = customerId;
+        await user.save();
+      }
+
+      // Create a real test payment method using Stripe test card number
+      const paymentMethod = await stripe.paymentMethods.create({
+        type: 'card',
+        card: {
+          number: '4242424242424242', // Stripe test card
+          exp_month: parseInt(expiryDate.split('/')[0]),
+          exp_year: parseInt('20' + expiryDate.split('/')[1]),
+          cvc: ccv,
+        },
+      });
+
+      // Attach the payment method to the customer
+      await stripe.paymentMethods.attach(paymentMethod.id, {
+        customer: user.stripeCustomerId,
+      });
+
+      stripePaymentMethodId = paymentMethod.id;
+
+    } catch (stripeError) {
+      console.error('Stripe error in test card creation:', stripeError);
+      // Fall back to mock ID if Stripe fails (for development)
+      stripePaymentMethodId = `pm_test_${Date.now()}_${lastFourDigits}`;
+    }
 
     // Create payment card record (store only last 4 digits for security)
     const paymentCard = await PaymentCard.create({
@@ -557,7 +613,7 @@ const addPaymentCardTest = async (req, res) => {
       ccv, // Note: In production, consider not storing CCV at all
       nickname,
       isDefault: isDefault || false,
-      stripePaymentMethodId: mockStripePaymentMethodId
+      stripePaymentMethodId: stripePaymentMethodId
     });
 
     // Return card data with masked number
