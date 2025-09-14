@@ -168,9 +168,25 @@ const handleWebhook = async (req, res) => {
                 if (!account) {
                     console.error(`Account ${accountNumber} (${accountType}) not found.`);
                 } else {
-                    // update the account balance
-                    account.balance += amount;
+                    // Update the account balance
+                    const oldBalance = parseFloat(account.balance);
+                    account.balance = oldBalance + amount;
                     await account.save();
+
+                    // Create transaction record
+                    await Transaction.create({
+                        accountId: account.id,
+                        amount: amount,
+                        type: 'Credit',
+                        description: `Deposit from funder via Stripe`,
+                        reference: paymentIntent.id,
+                        metadata: {
+                            source: 'stripe_payment',
+                            paymentIntentId: paymentIntent.id,
+                            oldBalance: oldBalance,
+                            newBalance: parseFloat(account.balance)
+                        }
+                    });
 
                     console.log(`Payment succeeded for account: ${accountNumber} (${accountType}), Amount: ${amount}`);
                 }

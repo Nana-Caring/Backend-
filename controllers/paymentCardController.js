@@ -420,9 +420,29 @@ const createPaymentIntentWithCard = async (req, res) => {
 
     // Get user
     const user = await User.findByPk(userId);
-    if (!user || !user.stripeCustomerId) {
-      return res.status(404).json({
-        message: 'Stripe customer not found'
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Ensure Stripe customer exists (auto-create if missing)
+    try {
+      if (!user.stripeCustomerId) {
+        const customerId = await createStripeCustomer(user); // helper defined above
+        // Persist on the user instance if needed for downstream use
+        user.stripeCustomerId = customerId;
+      }
+    } catch (e) {
+      return res.status(500).json({
+        message: 'Failed to set up Stripe customer',
+        error: e.message
+      });
+    }
+
+    // Ensure this card is linked to Stripe (has payment method)
+    if (!card.stripePaymentMethodId) {
+      return res.status(400).json({
+        message: 'This card is not set up for Stripe payments',
+        hint: 'Add a card using /payment-cards/add or /payment-cards/add-stripe to create and attach a Stripe payment method.'
       });
     }
 
@@ -432,10 +452,11 @@ const createPaymentIntentWithCard = async (req, res) => {
       currency: 'zar',
       customer: user.stripeCustomerId,
       payment_method: card.stripePaymentMethodId,
+      confirm: false, // frontend will confirm
       description: description || 'Payment via NANA platform',
       metadata: {
         userId: userId.toString(),
-        cardId: cardId
+        cardId: String(cardId)
       }
     });
 

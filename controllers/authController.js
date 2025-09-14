@@ -203,6 +203,7 @@ exports.registerDependent = async (req, res) => {
     // Create main account for dependent
     const mainAccount = await Account.create({
       userId: dependent.id,
+      caregiverId: req.user.id, // Link to the caregiver who is registering this dependent
       accountType: 'Main',
       balance: 0,
       parentAccountId: null,
@@ -218,6 +219,7 @@ exports.registerDependent = async (req, res) => {
         const subAccountNumber = await generateUniqueAccountNumber();
         return Account.create({
           userId: dependent.id,
+          caregiverId: req.user.id, // Link to the caregiver who is registering this dependent
           accountType: type,
           balance: 0,
           parentAccountId: mainAccount.id,
@@ -297,16 +299,55 @@ exports.getDependents = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
     
-    const dependents = await User.findAll({
-      where: { role: 'dependent' },
-      attributes: { exclude: ["password"] },
+    // Find dependents by finding accounts that belong to this caregiver
+    // and then getting the users associated with those accounts
+    const dependentAccounts = await Account.findAll({
+      where: { 
+        caregiverId: req.user.id,
+        accountType: 'Main' // Only get main accounts to avoid duplicates
+      },
       include: [{
-        model: Account,
-        as: "accounts",
-        attributes: ["id", "accountType", "balance", "parentAccountId"]
+        model: User,
+        as: 'user',
+        where: { role: 'dependent' },
+        attributes: { exclude: ["password"] }
       }]
     });
 
+    // Extract unique dependents from the accounts
+    const dependentsMap = new Map();
+    dependentAccounts.forEach(account => {
+      if (account.user && !dependentsMap.has(account.user.id)) {
+        dependentsMap.set(account.user.id, {
+          ...account.user.toJSON(),
+          accounts: []
+        });
+      }
+    });
+
+    // Now get all accounts for each dependent
+    const dependentIds = Array.from(dependentsMap.keys());
+    if (dependentIds.length > 0) {
+      const allAccounts = await Account.findAll({
+        where: { 
+          caregiverId: req.user.id,
+          userId: dependentIds
+        },
+        attributes: ["id", "accountType", "balance", "parentAccountId", "userId"],
+        order: [['accountType', 'ASC']]
+      });
+
+      // Group accounts by userId
+      allAccounts.forEach(account => {
+        const dependent = dependentsMap.get(account.userId);
+        if (dependent) {
+          dependent.accounts.push(account.toJSON());
+        }
+      });
+    }
+
+    const dependents = Array.from(dependentsMap.values());
+    
     res.json({ dependents });
   } catch (error) {
     console.error(error);
