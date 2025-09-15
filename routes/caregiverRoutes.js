@@ -5,7 +5,10 @@ const {
     getCaregiverDependents,
     getDependentById,
     getCaregiverStats,
-    getRecentActivity
+    getRecentActivity,
+    getAllDependentTransactions,
+    getDependentTransactions,
+    getTransactionAnalytics
 } = require('../controllers/caregiverController');
 
 // Middleware to check if user is a caregiver
@@ -31,6 +34,16 @@ router.get('/stats', getCaregiverStats);
 
 // Get recent activity across all dependents
 router.get('/activity', getRecentActivity);
+
+// Transaction tracking routes
+// Get all transactions for all dependents
+router.get('/transactions', getAllDependentTransactions);
+
+// Get transaction analytics
+router.get('/transactions/analytics', getTransactionAnalytics);
+
+// Get transactions for a specific dependent
+router.get('/dependents/:dependentId/transactions', getDependentTransactions);
 
 // Get specific dependent details by ID
 router.get('/dependents/:dependentId', getDependentById);

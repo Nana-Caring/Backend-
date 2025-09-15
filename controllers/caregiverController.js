@@ -438,9 +438,460 @@ const getRecentActivity = async (req, res) => {
     }
 };
 
+// Get all transactions for all dependents assigned to this caregiver
+const getAllDependentTransactions = async (req, res) => {
+    try {
+        const caregiverId = req.user.id;
+        const { 
+            page = 1, 
+            limit = 20, 
+            dependentId, 
+            accountType, 
+            transactionType, // 'Credit', 'Debit', or 'all'
+            startDate, 
+            endDate,
+            minAmount,
+            maxAmount,
+            sortBy = 'timestamp',
+            sortOrder = 'DESC'
+        } = req.query;
+
+        const offset = (page - 1) * limit;
+
+        // Build transaction filters
+        let transactionWhere = {};
+        
+        if (transactionType && transactionType !== 'all') {
+            transactionWhere.type = transactionType;
+        }
+
+        if (startDate || endDate) {
+            transactionWhere.timestamp = {};
+            if (startDate) {
+                transactionWhere.timestamp[Op.gte] = new Date(startDate);
+            }
+            if (endDate) {
+                transactionWhere.timestamp[Op.lte] = new Date(endDate);
+            }
+        }
+
+        if (minAmount || maxAmount) {
+            transactionWhere.amount = {};
+            if (minAmount) {
+                transactionWhere.amount[Op.gte] = parseFloat(minAmount);
+            }
+            if (maxAmount) {
+                transactionWhere.amount[Op.lte] = parseFloat(maxAmount);
+            }
+        }
+
+        // Build account filters
+        let accountWhere = { caregiverId: caregiverId };
+        if (accountType && accountType !== 'all') {
+            accountWhere.accountType = accountType;
+        }
+
+        // Build user filters
+        let userWhere = { role: 'dependent' };
+        if (dependentId) {
+            userWhere.id = dependentId;
+        }
+
+        // Get all transactions for this caregiver's dependents
+        const transactions = await Transaction.findAndCountAll({
+            where: transactionWhere,
+            include: [
+                {
+                    model: Account,
+                    as: 'account',
+                    where: accountWhere,
+                    include: [
+                        {
+                            model: User,
+                            as: 'user',
+                            where: userWhere,
+                            attributes: ['id', 'firstName', 'middleName', 'surname', 'email']
+                        }
+                    ]
+                }
+            ],
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            order: [[sortBy, sortOrder.toUpperCase()]],
+            distinct: true
+        });
+
+        // Transform response
+        const transformedTransactions = transactions.rows.map(transaction => ({
+            id: transaction.id,
+            amount: parseFloat(transaction.amount),
+            type: transaction.type,
+            description: transaction.description,
+            reference: transaction.reference,
+            timestamp: transaction.timestamp,
+            metadata: transaction.metadata,
+            dependent: {
+                id: transaction.account.user.id,
+                firstName: transaction.account.user.firstName,
+                middleName: transaction.account.user.middleName,
+                surname: transaction.account.user.surname,
+                fullName: `${transaction.account.user.firstName} ${transaction.account.user.middleName || ''} ${transaction.account.user.surname}`.trim(),
+                email: transaction.account.user.email
+            },
+            account: {
+                id: transaction.account.id,
+                accountNumber: transaction.account.accountNumber,
+                accountType: transaction.account.accountType,
+                balance: parseFloat(transaction.account.balance)
+            }
+        }));
+
+        const totalPages = Math.ceil(transactions.count / limit);
+
+        res.status(200).json({
+            success: true,
+            message: 'Transactions retrieved successfully',
+            data: {
+                transactions: transformedTransactions,
+                pagination: {
+                    currentPage: parseInt(page),
+                    totalPages,
+                    totalItems: transactions.count,
+                    itemsPerPage: parseInt(limit),
+                    hasNextPage: page < totalPages,
+                    hasPrevPage: page > 1
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Get all dependent transactions error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve transactions',
+            error: error.message
+        });
+    }
+};
+
+// Get transactions for a specific dependent
+const getDependentTransactions = async (req, res) => {
+    try {
+        const caregiverId = req.user.id;
+        const { dependentId } = req.params;
+        const { 
+            page = 1, 
+            limit = 20, 
+            accountType, 
+            transactionType, // 'Credit', 'Debit', or 'all'
+            startDate, 
+            endDate,
+            minAmount,
+            maxAmount,
+            sortBy = 'timestamp',
+            sortOrder = 'DESC'
+        } = req.query;
+
+        const offset = (page - 1) * limit;
+
+        // Verify that this dependent belongs to this caregiver
+        const dependentCheck = await Account.findOne({
+            where: { 
+                caregiverId: caregiverId,
+                userId: dependentId 
+            },
+            include: [{
+                model: User,
+                as: 'user',
+                where: { role: 'dependent' }
+            }]
+        });
+
+        if (!dependentCheck) {
+            return res.status(404).json({
+                success: false,
+                message: 'Dependent not found or not assigned to you'
+            });
+        }
+
+        // Build transaction filters
+        let transactionWhere = {};
+        
+        if (transactionType && transactionType !== 'all') {
+            transactionWhere.type = transactionType;
+        }
+
+        if (startDate || endDate) {
+            transactionWhere.timestamp = {};
+            if (startDate) {
+                transactionWhere.timestamp[Op.gte] = new Date(startDate);
+            }
+            if (endDate) {
+                transactionWhere.timestamp[Op.lte] = new Date(endDate);
+            }
+        }
+
+        if (minAmount || maxAmount) {
+            transactionWhere.amount = {};
+            if (minAmount) {
+                transactionWhere.amount[Op.gte] = parseFloat(minAmount);
+            }
+            if (maxAmount) {
+                transactionWhere.amount[Op.lte] = parseFloat(maxAmount);
+            }
+        }
+
+        // Build account filters
+        let accountWhere = { 
+            caregiverId: caregiverId,
+            userId: dependentId 
+        };
+        if (accountType && accountType !== 'all') {
+            accountWhere.accountType = accountType;
+        }
+
+        // Get transactions for this specific dependent
+        const transactions = await Transaction.findAndCountAll({
+            where: transactionWhere,
+            include: [
+                {
+                    model: Account,
+                    as: 'account',
+                    where: accountWhere,
+                    include: [
+                        {
+                            model: User,
+                            as: 'user',
+                            attributes: ['id', 'firstName', 'middleName', 'surname', 'email']
+                        }
+                    ]
+                }
+            ],
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            order: [[sortBy, sortOrder.toUpperCase()]],
+            distinct: true
+        });
+
+        // Get account summaries for this dependent
+        const accountSummaries = await Account.findAll({
+            where: {
+                caregiverId: caregiverId,
+                userId: dependentId
+            },
+            attributes: [
+                'id',
+                'accountNumber',
+                'accountType',
+                'balance',
+                [Sequelize.fn('COUNT', Sequelize.col('transactions.id')), 'transactionCount'],
+                [Sequelize.fn('SUM', Sequelize.literal('CASE WHEN transactions.type = \'Credit\' THEN transactions.amount ELSE 0 END')), 'totalCredits'],
+                [Sequelize.fn('SUM', Sequelize.literal('CASE WHEN transactions.type = \'Debit\' THEN transactions.amount ELSE 0 END')), 'totalDebits']
+            ],
+            include: [
+                {
+                    model: Transaction,
+                    as: 'transactions',
+                    attributes: [],
+                    required: false
+                }
+            ],
+            group: ['Account.id'],
+            raw: true
+        });
+
+        // Transform response
+        const transformedTransactions = transactions.rows.map(transaction => ({
+            id: transaction.id,
+            amount: parseFloat(transaction.amount),
+            type: transaction.type,
+            description: transaction.description,
+            reference: transaction.reference,
+            timestamp: transaction.timestamp,
+            metadata: transaction.metadata,
+            account: {
+                id: transaction.account.id,
+                accountNumber: transaction.account.accountNumber,
+                accountType: transaction.account.accountType,
+                balance: parseFloat(transaction.account.balance)
+            }
+        }));
+
+        const totalPages = Math.ceil(transactions.count / limit);
+
+        res.status(200).json({
+            success: true,
+            message: 'Dependent transactions retrieved successfully',
+            data: {
+                dependent: {
+                    id: dependentCheck.user.id,
+                    firstName: dependentCheck.user.firstName,
+                    middleName: dependentCheck.user.middleName,
+                    surname: dependentCheck.user.surname,
+                    fullName: `${dependentCheck.user.firstName} ${dependentCheck.user.middleName || ''} ${dependentCheck.user.surname}`.trim(),
+                    email: dependentCheck.user.email
+                },
+                accountSummaries: accountSummaries.map(account => ({
+                    id: account.id,
+                    accountNumber: account.accountNumber,
+                    accountType: account.accountType,
+                    balance: parseFloat(account.balance || 0),
+                    transactionCount: parseInt(account.transactionCount || 0),
+                    totalCredits: parseFloat(account.totalCredits || 0),
+                    totalDebits: parseFloat(account.totalDebits || 0),
+                    netAmount: parseFloat((account.totalCredits || 0) - (account.totalDebits || 0))
+                })),
+                transactions: transformedTransactions,
+                pagination: {
+                    currentPage: parseInt(page),
+                    totalPages,
+                    totalItems: transactions.count,
+                    itemsPerPage: parseInt(limit),
+                    hasNextPage: page < totalPages,
+                    hasPrevPage: page > 1
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Get dependent transactions error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve dependent transactions',
+            error: error.message
+        });
+    }
+};
+
+// Get transaction analytics for all dependents
+const getTransactionAnalytics = async (req, res) => {
+    try {
+        const caregiverId = req.user.id;
+        const { 
+            period = '30', // days
+            dependentId,
+            groupBy = 'day' // 'day', 'week', 'month'
+        } = req.query;
+
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - parseInt(period));
+
+        // Build filters
+        let accountWhere = { caregiverId: caregiverId };
+        let userWhere = { role: 'dependent' };
+        
+        if (dependentId) {
+            userWhere.id = dependentId;
+        }
+
+        // Get transaction analytics
+        const analytics = await Transaction.findAll({
+            where: {
+                timestamp: {
+                    [Op.gte]: startDate
+                }
+            },
+            include: [
+                {
+                    model: Account,
+                    as: 'account',
+                    where: accountWhere,
+                    include: [
+                        {
+                            model: User,
+                            as: 'user',
+                            where: userWhere,
+                            attributes: ['id', 'firstName', 'surname']
+                        }
+                    ]
+                }
+            ],
+            attributes: [
+                'type',
+                'amount',
+                'timestamp',
+                [Sequelize.fn('DATE', Sequelize.col('timestamp')), 'date']
+            ],
+            order: [['timestamp', 'ASC']]
+        });
+
+        // Group analytics by period
+        const groupedData = {};
+        analytics.forEach(transaction => {
+            const date = transaction.dataValues.date;
+            if (!groupedData[date]) {
+                groupedData[date] = {
+                    date,
+                    totalCredits: 0,
+                    totalDebits: 0,
+                    creditCount: 0,
+                    debitCount: 0,
+                    netAmount: 0
+                };
+            }
+
+            if (transaction.type === 'Credit') {
+                groupedData[date].totalCredits += parseFloat(transaction.amount);
+                groupedData[date].creditCount += 1;
+            } else {
+                groupedData[date].totalDebits += parseFloat(transaction.amount);
+                groupedData[date].debitCount += 1;
+            }
+            groupedData[date].netAmount = groupedData[date].totalCredits - groupedData[date].totalDebits;
+        });
+
+        // Calculate overall totals
+        const overallTotals = analytics.reduce((acc, transaction) => {
+            if (transaction.type === 'Credit') {
+                acc.totalCredits += parseFloat(transaction.amount);
+                acc.creditCount += 1;
+            } else {
+                acc.totalDebits += parseFloat(transaction.amount);
+                acc.debitCount += 1;
+            }
+            return acc;
+        }, {
+            totalCredits: 0,
+            totalDebits: 0,
+            creditCount: 0,
+            debitCount: 0
+        });
+
+        overallTotals.netAmount = overallTotals.totalCredits - overallTotals.totalDebits;
+        overallTotals.totalTransactions = overallTotals.creditCount + overallTotals.debitCount;
+
+        res.status(200).json({
+            success: true,
+            message: 'Transaction analytics retrieved successfully',
+            data: {
+                period: `${period} days`,
+                overallTotals,
+                dailyBreakdown: Object.values(groupedData),
+                summary: {
+                    averageDailyCredits: overallTotals.totalCredits / parseInt(period),
+                    averageDailyDebits: overallTotals.totalDebits / parseInt(period),
+                    averageTransactionSize: overallTotals.totalTransactions > 0 ? 
+                        (overallTotals.totalCredits + overallTotals.totalDebits) / overallTotals.totalTransactions : 0
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Get transaction analytics error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve transaction analytics',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     getCaregiverDependents,
     getDependentById,
     getCaregiverStats,
-    getRecentActivity
+    getRecentActivity,
+    getAllDependentTransactions,
+    getDependentTransactions,
+    getTransactionAnalytics
 };
