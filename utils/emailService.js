@@ -25,7 +25,7 @@ function getPasswordResetEmail({ user, resetUrl }) {
     return `
         <div style="font-family: Arial, sans-serif; background: #f7f9fa; padding: 32px; border-radius: 8px; max-width: 480px; margin: auto;">
             <div style="text-align: center; margin-bottom: 24px;">
-                <img src='/assets/nana-logo.png' alt='NANA Logo' style='height: 60px; margin-bottom: 8px;' />
+                <img src='https://nanacaring-backend.onrender.com/assets/logo.jpg' alt='NANA Logo' style='height: 60px; margin-bottom: 8px;' />
                 <h2 style="color: #2d7ff9; margin: 0;">NANA Portal Password Reset</h2>
             </div>
             <p style="font-size: 16px;">Hi ${user.firstName || user.email},</p>
@@ -48,7 +48,7 @@ function getWelcomeEmail({ user, password, loginUrl = 'https://nanacaring-backen
     return `
         <div style="font-family: Arial, sans-serif; background: #f7f9fa; padding: 32px; border-radius: 8px; max-width: 520px; margin: auto;">
             <div style="text-align: center; margin-bottom: 24px;">
-                <img src='/assets/nana-logo.png' alt='NANA Logo' style='height: 60px; margin-bottom: 8px;' />
+                <img src='https://nanacaring-backend.onrender.com/assets/logo.jpg' alt='NANA Logo' style='height: 60px; margin-bottom: 8px;' />
                 <h2 style="color: #2d7ff9; margin: 0;">Welcome to NANA Portal!</h2>
             </div>
             

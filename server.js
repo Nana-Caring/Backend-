@@ -35,6 +35,9 @@ app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
 
+// Serve static files from assets folder (for logo in emails)
+app.use('/assets', express.static('assets'));
+
 // Routes
 const portalRoutes = require('./routes/portal');
 app.use('/api/stripe', stripeRoutes);
