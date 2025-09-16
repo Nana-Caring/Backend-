@@ -1,37 +1,83 @@
-const axios = require('axios');
+const http = require('http');
+
+async function makeRequest(method, path, data) {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify(data);
+    
+    const options = {
+      hostname: 'localhost',
+      port: 5000,
+      path: path,
+      method: method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    const req = http.request(options, (res) => {
+      let responseData = '';
+      
+      res.on('data', (chunk) => {
+        responseData += chunk;
+      });
+      
+      res.on('end', () => {
+        try {
+          const jsonData = JSON.parse(responseData);
+          resolve({
+            status: res.statusCode,
+            data: jsonData
+          });
+        } catch (error) {
+          resolve({
+            status: res.statusCode,
+            data: { error: 'Invalid JSON response', raw: responseData }
+          });
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      reject(error);
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
 
 async function testForgotPasswordEndToEnd() {
   try {
-    const baseUrl = 'http://localhost:5000/api/auth';
     const testEmail = 'john.smiths34@example.com';
 
     console.log('🧪 Testing Forgot Password End-to-End...\n');
 
-    // Test 1: Test forgot password request
-    console.log('📊 Test 1: Testing forgot password request...');
+    // Test 1: Test forgot password request (unauthenticated)
+    console.log('📊 Test 1: Testing unauthenticated forgot password request...');
     try {
-      const response = await axios.post(`${baseUrl}/test-forgot-password`, {
+      const response = await makeRequest('POST', '/api/auth/test-forgot-password', {
         email: testEmail
       });
 
-      if (response.data.success) {
-        console.log('✅ Forgot password request successful');
+      if (response.status === 200 && response.data.success) {
+        console.log('✅ Forgot password request successful (no authentication required)');
         console.log(`   Token: ${response.data.data.token.substring(0, 20)}...`);
         console.log(`   Expires: ${response.data.data.expiresAt}`);
         
         const token = response.data.data.token;
 
-        // Test 2: Test password reset with the token
-        console.log('\n📊 Test 2: Testing password reset...');
+        // Test 2: Test password reset with the token (unauthenticated)
+        console.log('\n📊 Test 2: Testing unauthenticated password reset...');
         try {
-          const resetResponse = await axios.post(`${baseUrl}/reset-password`, {
+          const resetResponse = await makeRequest('POST', '/api/auth/reset-password', {
             email: testEmail,
             token: token,
             newPassword: 'newTestPassword123'
           });
 
-          if (resetResponse.data.success) {
-            console.log('✅ Password reset successful');
+          if (resetResponse.status === 200 && resetResponse.data.success) {
+            console.log('✅ Password reset successful (no authentication required)');
             console.log(`   Message: ${resetResponse.data.message}`);
             console.log(`   User Role: ${resetResponse.data.userRole}`);
           } else {
@@ -40,40 +86,43 @@ async function testForgotPasswordEndToEnd() {
           }
         } catch (resetError) {
           console.log('❌ Password reset request failed');
-          console.log(resetError.response?.data || resetError.message);
+          console.log(resetError.message);
         }
 
       } else {
         console.log('❌ Forgot password request failed');
+        console.log(`Status: ${response.status}`);
         console.log(response.data);
       }
     } catch (forgotError) {
       console.log('❌ Forgot password request failed');
-      console.log(forgotError.response?.data || forgotError.message);
+      console.log(forgotError.message);
     }
 
-    // Test 3: Test production forgot password endpoint
-    console.log('\n📊 Test 3: Testing production forgot password endpoint...');
+    // Test 3: Test production forgot password endpoint (unauthenticated)
+    console.log('\n📊 Test 3: Testing production forgot password endpoint (unauthenticated)...');
     try {
-      const prodResponse = await axios.post(`${baseUrl}/forgot-password`, {
+      const prodResponse = await makeRequest('POST', '/api/auth/forgot-password', {
         email: testEmail
       });
 
-      if (prodResponse.data.success) {
-        console.log('✅ Production forgot password endpoint working');
+      if (prodResponse.status === 200 && prodResponse.data.success) {
+        console.log('✅ Production forgot password endpoint working (no authentication required)');
         console.log(`   Message: ${prodResponse.data.message}`);
         console.log(`   Email Sent: ${prodResponse.data.emailSent || 'Not specified'}`);
       } else {
         console.log('❌ Production forgot password failed');
+        console.log(`Status: ${prodResponse.status}`);
         console.log(prodResponse.data);
       }
     } catch (prodError) {
       console.log('❌ Production forgot password request failed');
-      if (prodError.response?.data) {
-        console.log(prodError.response.data);
-      } else {
-        console.log('   Error: Server not running or endpoint not accessible');
+      if (prodError.code === 'ECONNREFUSED') {
+        console.log('   Error: Server not running');
         console.log('   Make sure your server is running on port 5000');
+        console.log('   Run: npm start');
+      } else {
+        console.log(`   Error: ${prodError.message}`);
       }
     }
 

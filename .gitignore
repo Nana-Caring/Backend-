@@ -1,4 +1,59 @@
-node_modules
+# Dependencies
+node_modules/
+package-lock.json
 
+# Environment variables
 .env
+.env.local
+.env.production
+
+# Configuration files
 config.json
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+test-*.js
+test-*.ps1
+fix-*.js
+setup-*.js
+verify-*.js
+
+# Build outputs
+dist/
+build/
+
+# Database files
+*.sqlite
+*.db
