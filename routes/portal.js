@@ -76,7 +76,7 @@ router.post('/request-password-reset', authenticate, async (req, res) => {
         await user.update({ resetToken: token, resetTokenExpires: expires });
         // Send email
         const { sendMail, getPasswordResetEmail } = require('../utils/emailService');
-        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
         const html = getPasswordResetEmail({ user, resetUrl });
         await sendMail({
             to: email,

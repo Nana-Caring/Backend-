@@ -109,7 +109,7 @@ router.post(
       });
 
       // Prepare reset URL
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5000';
       const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
 
       // Send email with reset link
@@ -210,7 +210,7 @@ if (process.env.NODE_ENV === 'development') {
         await user.update({ resetToken: token, resetTokenExpires: expires });
 
         // For testing: return token directly instead of sending email
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5000';
         const resetUrl = `${frontendUrl}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
 
         res.json({ 
