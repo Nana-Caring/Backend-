@@ -571,15 +571,23 @@ exports.forgotPassword = async (req, res) => {
       resetTokenExpires: resetTokenExpiry
     });
 
-    // Send password reset email
+    // Send password reset email with both web and mobile app links
     try {
       const { sendMail, getPasswordResetEmail } = require('../utils/emailService');
       
-      // Create reset URL - point to frontend reset password page
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  const resetUrl = `${frontendUrl}/reset-password/${resetToken}?email=${encodeURIComponent(email)}`;
+      // DUAL PLATFORM SUPPORT: Create both web URL and mobile deep link
+      // This allows users to choose between web browser or mobile app
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const appScheme = process.env.APP_SCHEME || 'nanacaring'; // Mobile app URL scheme
       
-      const emailHtml = getPasswordResetEmail({ user, resetUrl });
+      // Web URL: Traditional browser-based reset link
+      const webResetUrl = `${frontendUrl}/reset-password/${resetToken}?email=${encodeURIComponent(email)}`;
+      
+      // Mobile Deep Link: Opens directly in the mobile app
+      const mobileDeepLink = `${appScheme}://reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
+      
+      // Generate email HTML with both web and mobile options
+      const emailHtml = getPasswordResetEmail({ user, resetUrl: webResetUrl, mobileUrl: mobileDeepLink });
       
       await sendMail({
         to: email,
