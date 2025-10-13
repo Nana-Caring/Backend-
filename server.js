@@ -8,6 +8,7 @@ const helmet = require('helmet');
 const db = require('./models');
 const stripeRoutes = require('./routes/stripeRoutes');
 const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/admin');
 const funderRoutes = require('./routes/funderRoutes');
 const statsRoutes = require('./routes/statsRoutes');
@@ -36,6 +37,7 @@ app.use(cookieParser());
 // Routes
 app.use('/api/stripe', stripeRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/admin', adminRoutes);
 app.use('/api/funder', funderRoutes);
 app.use('/api/stats', statsRoutes);

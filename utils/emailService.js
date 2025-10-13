@@ -40,8 +40,9 @@ async function sendMail({ to, subject, html }) {
   }
 }
 
-// Generate password reset email HTML
-function getPasswordResetEmail({ user, resetUrl }) {
+// Generate password reset email HTML with dual platform support
+// Supports both web browsers and mobile app deep links
+function getPasswordResetEmail({ user, resetUrl, mobileUrl }) {
   return `
     <div style="font-family: Arial, sans-serif; background: #f7f9fa; padding: 32px; border-radius: 8px; max-width: 600px; margin: auto;">
       <div style="text-align: center; margin-bottom: 24px;">
@@ -52,11 +53,27 @@ function getPasswordResetEmail({ user, resetUrl }) {
       
       <p style="font-size: 15px;">You requested a password reset for your NANA Portal account.</p>
       
+      <!-- DUAL PLATFORM RESET OPTIONS: Web and Mobile App -->
       <div style="background: #fff; padding: 20px; border-radius: 6px; margin: 24px 0; border-left: 4px solid #2d7ff9;">
-        <p style="margin: 0 0 16px 0; font-size: 15px;">Click the button below to reset your password:</p>
+        <p style="margin: 0 0 16px 0; font-size: 15px;">Choose how you'd like to reset your password:</p>
+        
+        <!-- Reset buttons for both web and mobile platforms -->
         <div style="text-align: center; margin: 20px 0;">
-          <a href="${resetUrl}" style="background: #2d7ff9; color: #fff; padding: 12px 32px; text-decoration: none; border-radius: 4px; font-size: 16px; display: inline-block;">Reset Password</a>
+          <!-- Web browser reset button (blue) -->
+          <a href="${resetUrl}" style="background: #2d7ff9; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-size: 16px; display: inline-block; margin: 5px;">🌐 Reset on Web</a>
+          
+          <!-- Mobile app deep link button (green) - only shows if mobile URL provided -->
+          ${mobileUrl ? `<a href="${mobileUrl}" style="background: #28a745; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-size: 16px; display: inline-block; margin: 5px;">📱 Open in App</a>` : ''}
         </div>
+        
+        <!-- Mobile user tip - only shows if mobile URL is available -->
+        ${mobileUrl ? `
+        <div style="background: #e7f3ff; border: 1px solid #b3d9ff; padding: 12px; border-radius: 4px; margin: 16px 0;">
+          <p style="margin: 0; font-size: 13px; color: #0066cc;">
+            💡 <strong>Tip:</strong> If you're on your phone, tap "Open in App" to reset your password directly in the NANA mobile app!
+          </p>
+        </div>
+        ` : ''}
       </div>
       
       <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 16px; border-radius: 6px; margin: 24px 0;">
@@ -65,9 +82,11 @@ function getPasswordResetEmail({ user, resetUrl }) {
         </p>
       </div>
       
+      <!-- Fallback links in case buttons don't work -->
       <p style="font-size: 14px; color: #555;">
-        If the button doesn't work, copy and paste this link into your browser:<br>
-        <a href="${resetUrl}" style="color: #2d7ff9; word-break: break-all;">${resetUrl}</a>
+        If the buttons don't work, you can copy and paste these links:<br>
+        <strong>Web Browser:</strong> <a href="${resetUrl}" style="color: #2d7ff9; word-break: break-all;">${resetUrl}</a><br>
+        ${mobileUrl ? `<strong>Mobile App:</strong> <a href="${mobileUrl}" style="color: #28a745; word-break: break-all;">${mobileUrl}</a>` : ''}
       </p>
       
       <hr style="margin: 32px 0; border: none; border-top: 1px solid #eee;" />
