@@ -1,56 +1,8 @@
-const express = require("express");
-const { check, validationResult } = require("express-validator");
-const rateLimit = require("express-rate-limit");
-const { register, login, getUser, registerDependent, adminLogin, verifyResetToken } = require("../controllers/authController");
-const authMiddleware = require("../middlewares/auth");
-
+const express = require('express');
+const { check, validationResult } = require('express-validator');
+const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
-
-// LOGIN
-router.post(
-  "/login",
-  [
-    check("email", "Include a valid email").isEmail(),
-    check("password", "Password is required").exists(),
-  ],
-  login
-);
-
-// ADMIN LOGIN
-router.post("/admin-login", adminLogin);
-
-// REGISTER (Funder or Caregiver)
-router.post(
-  "/register",
-  [
-    check("firstName", "First name is required").not().isEmpty(),
-    check("lastName", "Last name is required").not().isEmpty(),
-    check("surname", "Surname is required").not().isEmpty(),
-    check("email", "Include a valid email").isEmail(),
-    check("password", "Password must be at least 6 characters").isLength({ min: 6 }),
-    check("role", "Role must be either funder or caregiver").isIn(["funder", "caregiver"]),
-    check("Idnumber", "Valid 13-digit numeric ID number required").isLength({ min: 13, max: 13 }).isNumeric(),
-  ],
-  register
-);
-
-// REGISTER DEPENDENT (by Caregiver)
-router.post(
-  "/register-dependent",
-  [
-    authMiddleware,
-    check("firstName", "First name is required").not().isEmpty(),
-    check("lastName", "Last name is required").not().isEmpty(),
-    check("surname", "Surname is required").not().isEmpty(),
-    check("Idnumber", "Valid 13-digit numeric ID number required").isLength({ min: 13, max: 13 }).isNumeric(),
-    check("relation", "Relation is required").not().isEmpty(),
-  ],
-  registerDependent
-);
-
-// GET CURRENT USER
-router.get("/me", authMiddleware, getUser);
 
 // Rate limiting middleware for password reset requests
 const forgotPasswordLimiter = rateLimit({
@@ -60,25 +12,20 @@ const forgotPasswordLimiter = rateLimit({
   keyGenerator: (req) => req.body.email || req.ip
 });
 
-// Forgot Password (IMPROVED VERSION)
+// Forgot Password endpoint
 router.post(
-  "/forgot-password",
-  forgotPasswordLimiter, // Apply rate limiting here
+  '/forgot-password',
+  forgotPasswordLimiter,
   [
-    check("email", "Include a valid email").isEmail(),
+    check('email', 'Include a valid email').isEmail(),
   ],
   async (req, res) => {
-    console.log('🔍 FORGOT PASSWORD DEBUG: Request received');
-    console.log('📧 Email:', req.body.email);
-    console.log('🌐 User-Agent:', req.get('User-Agent'));
-    
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('❌ VALIDATION ERRORS:', errors.array());
       return res.status(400).json({ 
         success: false,
-        message: "Please provide a valid email address",
+        message: 'Please provide a valid email address',
         errors: errors.array() 
       });
     }
@@ -86,7 +33,7 @@ router.post(
     const { email } = req.body;
     
     try {
-      const User = require("../models/User");
+      const User = require('../models/User');
       const user = await User.findOne({ 
         where: { email: email.toLowerCase().trim() },
         attributes: ['id', 'firstName', 'middleName', 'surname', 'email', 'role']
@@ -140,7 +87,6 @@ router.post(
 
         console.log(`✅ Password reset email sent successfully to ${email} (${user.role})`);
         
-        console.log('📤 SENDING RESPONSE:', { success: true, message: successMessage, emailSent: true });
         res.json({ 
           success: true,
           message: successMessage,
@@ -174,81 +120,13 @@ router.post(
   }
 );
 
-
-// TESTING ENDPOINT: Forgot Password with Token Response (FOR DEVELOPMENT ONLY)
-if (process.env.NODE_ENV === 'development') {
-  router.post(
-    "/test-forgot-password",
-    [
-      check("email", "Include a valid email").isEmail(),
-    ],
-    async (req, res) => {
-      // Check for validation errors
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ 
-          success: false,
-          errors: errors.array() 
-        });
-      }
-
-      const { email } = req.body;
-      
-      try {
-        const User = require("../models/User");
-        const user = await User.findOne({ 
-          where: { email: email.toLowerCase().trim() },
-          attributes: ['id', 'firstName', 'surname', 'email', 'role']
-        });
-        
-        if (!user) {
-          return res.status(404).json({ 
-            success: false,
-            message: 'User not found with this email address.' 
-          });
-        }
-
-        // Generate secure token
-        const crypto = require('crypto');
-        const token = crypto.randomBytes(32).toString('hex');
-        const expires = Date.now() + (10 * 60 * 1000); // 10 minutes expiration
-
-        await user.update({ resetToken: token, resetTokenExpires: expires });
-
-        // For testing: return token directly instead of sending email
-        const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5000').replace(/\/$/, '');
-        const resetUrl = `${frontendUrl}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
-
-        res.json({ 
-          success: true,
-          message: 'Reset token generated successfully for testing.',
-          data: {
-            token: token,
-            email: email,
-            userRole: user.role,
-            expiresAt: new Date(expires).toISOString(),
-            resetUrl: resetUrl
-          },
-          note: 'This endpoint is for testing only. Use /forgot-password for production.'
-        });
-      } catch (error) {
-        console.error('Test forgot password error:', error);
-        res.status(500).json({ 
-          success: false,
-          message: 'Server error' 
-        });
-      }
-    }
-  );
-}
-
-// Reset Password (IMPROVED VERSION)
+// Reset Password endpoint
 router.post(
-  "/reset-password",
+  '/reset-password',
   [
-    check("email", "Include a valid email").isEmail(),
-    check("token", "Reset token is required").not().isEmpty(),
-    check("newPassword", "Password must be at least 6 characters").isLength({ min: 6 }),
+    check('email', 'Include a valid email').isEmail(),
+    check('token', 'Reset token is required').not().isEmpty(),
+    check('newPassword', 'Password must be at least 6 characters').isLength({ min: 6 }),
   ],
   async (req, res) => {
     // Check for validation errors
@@ -256,7 +134,7 @@ router.post(
     if (!errors.isEmpty()) {
       return res.status(400).json({ 
         success: false,
-        message: "Please check your input and try again",
+        message: 'Please check your input and try again',
         errors: errors.array() 
       });
     }
@@ -264,7 +142,7 @@ router.post(
     const { email, token, newPassword } = req.body;
 
     try {
-      const User = require("../models/User");
+      const User = require('../models/User');
       const user = await User.findOne({ 
         where: { 
           email: email.toLowerCase().trim(),
@@ -326,11 +204,4 @@ router.post(
   }
 );
 
-// Verify Reset Token
-router.post("/verify-reset-token", verifyResetToken);
-
 module.exports = router;
-
-
-
-
