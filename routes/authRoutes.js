@@ -68,14 +68,9 @@ router.post(
     check("email", "Include a valid email").isEmail(),
   ],
   async (req, res) => {
-    console.log('🔍 FORGOT PASSWORD DEBUG: Request received');
-    console.log('📧 Email:', req.body.email);
-    console.log('🌐 User-Agent:', req.get('User-Agent'));
-    
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('❌ VALIDATION ERRORS:', errors.array());
       return res.status(400).json({ 
         success: false,
         message: "Please provide a valid email address",
@@ -138,9 +133,6 @@ router.post(
           html: emailHtml
         });
 
-        console.log(`✅ Password reset email sent successfully to ${email} (${user.role})`);
-        
-        console.log('📤 SENDING RESPONSE:', { success: true, message: successMessage, emailSent: true });
         res.json({ 
           success: true,
           message: successMessage,
