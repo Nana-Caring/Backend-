@@ -109,7 +109,7 @@ router.post(
       });
 
       // Prepare reset URL
-      const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5000').replace(/\/$/, '');
+      const frontendUrl = (process.env.FRONTEND_URL || 'https://password-reset-29wr.onrender.com/').replace(/\/$/, '');
       const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
 
       // Send email with reset link
