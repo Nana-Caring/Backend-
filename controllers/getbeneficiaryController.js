@@ -14,7 +14,7 @@ exports.getMyBeneficiaries = async (req, res) => {
           include:[
             {
               model: db.Account,
-              as: 'accounts',
+              as: 'Accounts',
               attributes: ['accountNumber', 'accountType']
             }
           ]
