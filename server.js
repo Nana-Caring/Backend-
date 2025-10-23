@@ -1,6 +1,5 @@
-// Load environment variables based on NODE_ENV
-const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
-require('dotenv').config({ path: envFile });
+// Load environment variables from single .env file
+require('dotenv').config();
 const cookieParser = require('cookie-parser'); // For parsing cookies
 
 const express = require('express');
