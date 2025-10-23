@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { User, Account, Transaction } = require('../models');
+const { User, Account, Transaction, FunderDependent } = require('../models');
 const authenticate = require('../middlewares/auth');
 const isAdmin = require('../middlewares/isAdmin');
 const { check } = require('express-validator');
@@ -236,6 +236,140 @@ router.post('/fix-caregiver-relationship', authenticate, isAdmin, async (req, re
     res.status(500).json({
       success: false,
       message: 'Failed to fix relationship',
+      error: error.message
+    });
+  }
+});
+
+// FUNDER-DEPENDENT RELATIONSHIP MANAGEMENT
+router.post('/link-funder-dependent', authenticate, isAdmin, async (req, res) => {
+  try {
+    console.log('🔗 Linking funder with dependent...');
+    
+    const { funderEmail, dependentEmail } = req.body;
+    
+    // Default to demo users if no emails provided
+    const fEmail = funderEmail || 'funder@demo.com';
+    const dEmail = dependentEmail || 'dependent@demo.com';
+    
+    // Get funder and dependent users
+    const funder = await User.findOne({ where: { email: fEmail, role: 'funder' } });
+    const dependent = await User.findOne({ where: { email: dEmail, role: 'dependent' } });
+    
+    if (!funder) {
+      return res.status(404).json({
+        success: false,
+        message: `Funder not found with email: ${fEmail}`
+      });
+    }
+    
+    if (!dependent) {
+      return res.status(404).json({
+        success: false,
+        message: `Dependent not found with email: ${dEmail}`
+      });
+    }
+    
+    // Check if relationship already exists
+    const existingLink = await FunderDependent.findOne({
+      where: {
+        funderId: funder.id,
+        dependentId: dependent.id
+      }
+    });
+    
+    if (existingLink) {
+      return res.json({
+        success: true,
+        message: 'Funder-dependent relationship already exists',
+        data: {
+          linkId: existingLink.id,
+          funderId: funder.id,
+          funderName: `${funder.firstName} ${funder.surname}`,
+          dependentId: dependent.id,
+          dependentName: `${dependent.firstName} ${dependent.surname}`,
+          alreadyLinked: true
+        }
+      });
+    }
+    
+    // Create the relationship
+    const newLink = await FunderDependent.create({
+      funderId: funder.id,
+      dependentId: dependent.id
+    });
+    
+    console.log(`✅ Created funder-dependent link: ${funder.id} → ${dependent.id}`);
+    
+    res.json({
+      success: true,
+      message: 'Funder-dependent relationship created successfully',
+      data: {
+        linkId: newLink.id,
+        funderId: funder.id,
+        funderName: `${funder.firstName} ${funder.surname}`,
+        dependentId: dependent.id,
+        dependentName: `${dependent.firstName} ${dependent.surname}`,
+        createdAt: newLink.createdAt,
+        alreadyLinked: false
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error linking funder-dependent:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to link funder with dependent',
+      error: error.message
+    });
+  }
+});
+
+// GET funder-dependent relationships
+router.get('/funder-dependent-links', authenticate, isAdmin, async (req, res) => {
+  try {
+    const links = await FunderDependent.findAll({
+      include: [
+        {
+          model: User,
+          as: 'funder',
+          attributes: ['id', 'firstName', 'surname', 'email', 'role']
+        },
+        {
+          model: User,
+          as: 'dependent',
+          attributes: ['id', 'firstName', 'surname', 'email', 'role']
+        }
+      ]
+    });
+    
+    res.json({
+      success: true,
+      message: 'Funder-dependent relationships retrieved successfully',
+      data: {
+        linksCount: links.length,
+        links: links.map(link => ({
+          id: link.id,
+          funder: {
+            id: link.funder.id,
+            name: `${link.funder.firstName} ${link.funder.surname}`,
+            email: link.funder.email
+          },
+          dependent: {
+            id: link.dependent.id,
+            name: `${link.dependent.firstName} ${link.dependent.surname}`,
+            email: link.dependent.email
+          },
+          createdAt: link.createdAt
+        }))
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error getting funder-dependent links:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve funder-dependent relationships',
       error: error.message
     });
   }
