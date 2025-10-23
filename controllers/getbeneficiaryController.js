@@ -24,7 +24,7 @@ exports.getMyBeneficiaries = async (req, res) => {
     
    const beneficiaries = linkedDependents.map(entry => {
     const dep = entry.dependent;
-    const account = dep.accounts && dep.accounts[0];
+    const account = dep.Accounts && dep.Accounts[0];
     return {
     id: dep.id,
     firstName: dep.firstName,
