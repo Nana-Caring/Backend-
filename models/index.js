@@ -4,16 +4,33 @@ const { Sequelize } = require('sequelize');
 const path = require('path');
 require('dotenv').config();
 
-const sequelize = new Sequelize(process.env.DATABASE_URL, {
-    dialect: 'postgres',
-    dialectOptions: {
-        ssl: {
-            require: true,
-            rejectUnauthorized: false
-        }
-    },
-    logging: false
-});
+let sequelize;
+
+// Use DATABASE_URL if available (production), otherwise use config.json (development)
+if (process.env.DATABASE_URL) {
+    sequelize = new Sequelize(process.env.DATABASE_URL, {
+        dialect: 'postgres',
+        dialectOptions: {
+            ssl: {
+                require: true,
+                rejectUnauthorized: false
+            }
+        },
+        logging: false
+    });
+} else {
+    // Use config.json for local development
+    const config = require('../config/config.json');
+    const env = process.env.NODE_ENV || 'development';
+    const dbConfig = config[env];
+    
+    sequelize = new Sequelize(dbConfig.database, dbConfig.username, dbConfig.password, {
+        host: dbConfig.host,
+        port: dbConfig.port,
+        dialect: dbConfig.dialect,
+        logging: false
+    });
+}
 
 // Import models
 const User = require('./User');
@@ -21,13 +38,15 @@ const Account = require('./Account');
 const PaymentCard = require('./PaymentCard');
 const Transaction = require('./Transaction')(sequelize, Sequelize.DataTypes);
 const FunderDependent = require('./FunderDependent')(sequelize, Sequelize.DataTypes);
+const Product = require('./Product')(sequelize, Sequelize.DataTypes);
 
 const models = {
     User,
     Account,
     PaymentCard,
     Transaction,
-    FunderDependent
+    FunderDependent,
+    Product
 };
 
 // Set up associations
@@ -115,6 +134,17 @@ Transaction.belongsTo(Account, {
 Account.hasMany(Transaction, {
     foreignKey: 'accountId',
     as: 'transactions'
+});
+
+// Product associations (for future use with orders, reviews, etc.)
+Product.belongsTo(User, {
+    foreignKey: 'createdBy',
+    as: 'creator'
+});
+
+Product.belongsTo(User, {
+    foreignKey: 'updatedBy',
+    as: 'updater'
 });
 
 // Test connection

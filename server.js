@@ -16,19 +16,13 @@ const statsRoutes = require('./routes/statsRoutes');
 const accountRoutes = require('./routes/accountRoutes');
 const paymentCardRoutes = require('./routes/paymentCardRoutes');
 const transferRoutes = require('./routes/transferRoutes');
+const productRoutes = require('./routes/productRoutes');
 
 
 const app = express();
 
-// WARNING: Only use in development, not in production!
-(async () => {
-  try {
-    await db.sequelize.sync({ alter: true });
-    console.log('Database synced with models');
-  } catch (error) {
-    console.error('Error syncing database:', error);
-  }
-})();
+// Database is managed through migrations, no need to sync in production
+console.log('✅ Using migrations for database schema management');
 
 // Middleware
 app.use(helmet());
@@ -38,6 +32,9 @@ app.use(cookieParser());
 
 // Serve static files from assets folder (for logo in emails)
 app.use('/assets', express.static('assets'));
+
+// Serve static files from uploads folder (for product images)
+app.use('/uploads', express.static('uploads'));
 
 // Routes
 const portalRoutes = require('./routes/portal');
@@ -53,6 +50,7 @@ app.use('/api/payment-cards', paymentCardRoutes);
 app.use('/api/transfers', transferRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/portal', portalRoutes);
+app.use('/api/products', productRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

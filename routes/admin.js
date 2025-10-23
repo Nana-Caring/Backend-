@@ -3,6 +3,7 @@ const router = express.Router();
 const { User, Account, Transaction } = require('../models');
 const authenticate = require('../middlewares/auth');
 const isAdmin = require('../middlewares/isAdmin');
+const { check } = require('express-validator');
 const {
   getAllTransactions,
   getTransactionById,
@@ -24,6 +25,17 @@ const {
   getUserStats,
   checkExpiredSuspensions
 } = require('../controllers/adminTransactionController');
+const {
+  getAllProducts,
+  getProductById,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  getProductsByCategory,
+  getProductStats,
+  getProductsForDependent,
+  validateProductAccess
+} = require('../controllers/productController');
 
 // ========================================
 // USER MANAGEMENT ROUTES
@@ -89,6 +101,61 @@ router.delete('/transactions/:id', authenticate, isAdmin, deleteTransaction);
 
 // Bulk operations on transactions
 router.post('/transactions/bulk', authenticate, isAdmin, bulkOperations);
+
+// ========================================
+// PRODUCT MANAGEMENT ROUTES
+// ========================================
+
+// Get all products with filtering (Admin view - includes inactive products)
+router.get('/products', authenticate, isAdmin, getAllProducts);
+
+// Get product statistics
+router.get('/products/stats', authenticate, isAdmin, getProductStats);
+
+// Get products by category (for account type management)
+router.get('/products/category/:category', authenticate, isAdmin, getProductsByCategory);
+
+// Get specific product by ID
+router.get('/products/:id', authenticate, isAdmin, getProductById);
+
+// Create new product
+router.post('/products', authenticate, isAdmin, [
+  check('name', 'Product name is required').not().isEmpty(),
+  check('brand', 'Brand is required').not().isEmpty(),
+  check('price', 'Valid price is required').isDecimal({ decimal_digits: '0,2' }),
+  check('category', 'Valid category is required').isIn(['Education', 'Healthcare', 'Groceries', 'Transport', 'Entertainment', 'Other']),
+  check('sku', 'SKU is required').optional().not().isEmpty(),
+  check('image', 'Valid image URL required').optional().isURL(),
+  check('stockQuantity', 'Stock quantity must be a number').optional().isInt({ min: 0 }),
+  check('minAge', 'Minimum age must be between 0 and 150').optional().isInt({ min: 0, max: 150 }),
+  check('maxAge', 'Maximum age must be between 0 and 150').optional().isInt({ min: 0, max: 150 }),
+  check('ageCategory', 'Valid age category required').optional().isIn(['Toddler', 'Child', 'Teen', 'Adult', 'Senior', 'All Ages']),
+  check('requiresAgeVerification', 'Age verification must be boolean').optional().isBoolean()
+], createProduct);
+
+// Update product
+router.put('/products/:id', authenticate, isAdmin, [
+  check('name', 'Product name is required').optional().not().isEmpty(),
+  check('brand', 'Brand is required').optional().not().isEmpty(),
+  check('price', 'Valid price is required').optional().isDecimal({ decimal_digits: '0,2' }),
+  check('category', 'Valid category is required').optional().isIn(['Education', 'Healthcare', 'Groceries', 'Transport', 'Entertainment', 'Other']),
+  check('image', 'Valid image URL required').optional().isURL(),
+  check('stockQuantity', 'Stock quantity must be a number').optional().isInt({ min: 0 }),
+  check('minAge', 'Minimum age must be between 0 and 150').optional().isInt({ min: 0, max: 150 }),
+  check('maxAge', 'Maximum age must be between 0 and 150').optional().isInt({ min: 0, max: 150 }),
+  check('ageCategory', 'Valid age category required').optional().isIn(['Toddler', 'Child', 'Teen', 'Adult', 'Senior', 'All Ages']),
+  check('requiresAgeVerification', 'Age verification must be boolean').optional().isBoolean()
+], updateProduct);
+
+// Delete product (soft delete)
+router.delete('/products/:id', authenticate, isAdmin, deleteProduct);
+
+// Age-based product management
+// Get age-appropriate products for a specific dependent
+router.get('/dependents/:dependentId/products', authenticate, isAdmin, getProductsForDependent);
+
+// Validate if a dependent can access a specific product
+router.get('/dependents/:dependentId/products/:productId/validate', authenticate, isAdmin, validateProductAccess);
 
 // ========================================
 // LEGACY SIMPLE ROUTES (kept for compatibility)
