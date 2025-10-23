@@ -16,8 +16,36 @@ const getCaregiverDependents = async (req, res) => {
 
         const offset = (page - 1) * limit;
 
+        // First, find all accounts managed by this caregiver
+        const caregiverAccounts = await Account.findAll({
+            where: { caregiverId: caregiverId },
+            attributes: ['userId'],
+            group: ['userId'] // Get unique user IDs
+        });
+
+        const dependentIds = caregiverAccounts.map(acc => acc.userId);
+
+        if (dependentIds.length === 0) {
+            return res.status(200).json({
+                success: true,
+                message: 'No dependents found for this caregiver',
+                data: {
+                    dependents: [],
+                    pagination: {
+                        currentPage: parseInt(page),
+                        totalPages: 0,
+                        totalDependents: 0,
+                        hasNextPage: false,
+                        hasPrevPage: false,
+                        limit: parseInt(limit)
+                    }
+                }
+            });
+        }
+
         // Build search conditions for dependents
         let dependentWhere = {
+            id: { [Op.in]: dependentIds },
             role: 'dependent'
         };
 
@@ -35,64 +63,67 @@ const getCaregiverDependents = async (req, res) => {
             ];
         }
 
-        // Find all dependents that have accounts assigned to this caregiver
+        // Find dependents
         const dependents = await User.findAndCountAll({
             where: dependentWhere,
-            include: [
-                {
-                    model: Account,
-                    as: 'accounts',
-                    where: { caregiverId: caregiverId },
-                    required: true, // Only include users who have accounts with this caregiver
-                    include: [
-                        {
-                            model: Transaction,
-                            as: 'transactions',
-                            limit: 5, // Get last 5 transactions
-                            order: [['createdAt', 'DESC']],
-                            required: false
-                        }
-                    ]
-                }
-            ],
             limit: parseInt(limit),
             offset: parseInt(offset),
             order: [[sortBy, sortOrder.toUpperCase()]],
             distinct: true
         });
 
-        // Transform the response
-        const transformedDependents = dependents.rows.map(dependent => {
-            const account = dependent.accounts[0]; // Should only be one account per dependent
-            
-            return {
-                id: dependent.id,
-                firstName: dependent.firstName,
-                middleName: dependent.middleName,
-                surname: dependent.surname,
-                fullName: `${dependent.firstName} ${dependent.middleName || ''} ${dependent.surname}`.trim(),
-                email: dependent.email,
-                idNumber: dependent.Idnumber,
-                phoneNumber: dependent.phoneNumber,
-                relation: dependent.relation,
-                status: dependent.status,
-                isBlocked: dependent.isBlocked,
-                createdAt: dependent.createdAt,
-                updatedAt: dependent.updatedAt,
-                account: account ? {
-                    id: account.id,
-                    accountNumber: account.accountNumber,
-                    accountType: account.accountType,
-                    balance: parseFloat(account.balance),
-                    currency: account.currency,
-                    status: account.status,
-                    createdAt: account.createdAt,
-                    lastTransactionDate: account.lastTransactionDate,
-                    recentTransactions: account.transactions || []
-                } : null,
-                totalTransactions: account ? account.transactions.length : 0
-            };
-        });
+        // Get accounts and transactions for each dependent
+        const transformedDependents = await Promise.all(
+            dependents.rows.map(async (dependent) => {
+                // Get accounts for this dependent managed by this caregiver
+                const accounts = await Account.findAll({
+                    where: { 
+                        userId: dependent.id,
+                        caregiverId: caregiverId
+                    },
+                    include: [
+                        {
+                            model: Transaction,
+                            as: 'transactions',
+                            limit: 5,
+                            order: [['createdAt', 'DESC']],
+                            required: false
+                        }
+                    ]
+                });
+
+                const mainAccount = accounts.find(acc => acc.accountType === 'Main') || accounts[0];
+
+                return {
+                    id: dependent.id,
+                    firstName: dependent.firstName,
+                    middleName: dependent.middleName,
+                    surname: dependent.surname,
+                    fullName: `${dependent.firstName} ${dependent.middleName || ''} ${dependent.surname}`.trim(),
+                    email: dependent.email,
+                    idNumber: dependent.Idnumber,
+                    phoneNumber: dependent.phoneNumber,
+                    relation: dependent.relation,
+                    status: dependent.status,
+                    isBlocked: dependent.isBlocked,
+                    createdAt: dependent.createdAt,
+                    updatedAt: dependent.updatedAt,
+                    accountsCount: accounts.length,
+                    account: mainAccount ? {
+                        id: mainAccount.id,
+                        accountNumber: mainAccount.accountNumber,
+                        accountType: mainAccount.accountType,
+                        balance: parseFloat(mainAccount.balance || 0),
+                        currency: mainAccount.currency,
+                        status: mainAccount.status,
+                        createdAt: mainAccount.createdAt,
+                        lastTransactionDate: mainAccount.lastTransactionDate,
+                        recentTransactions: mainAccount.transactions || []
+                    } : null,
+                    totalTransactions: accounts.reduce((total, acc) => total + (acc.transactions?.length || 0), 0)
+                };
+            })
+        );
 
         const totalPages = Math.ceil(dependents.count / limit);
 

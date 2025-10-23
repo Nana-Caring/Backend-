@@ -187,4 +187,58 @@ router.get('/stats', authenticate, isAdmin, async (req, res) => {
   res.json({ users: userCount, accounts: accountCount, transactions: transactionCount });
 });
 
+// TEMPORARY: Fix caregiver-dependent relationship
+router.post('/fix-caregiver-relationship', authenticate, isAdmin, async (req, res) => {
+  try {
+    console.log('🔧 Fixing caregiver-dependent relationship...');
+    
+    // Get caregiver and dependent users
+    const caregiver = await User.findOne({ where: { email: 'caregiver@demo.com' } });
+    const dependent = await User.findOne({ where: { email: 'dependent@demo.com' } });
+    
+    if (!caregiver || !dependent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Caregiver or dependent not found'
+      });
+    }
+    
+    // Update all dependent's accounts to link to caregiver
+    const [updatedCount] = await Account.update(
+      { caregiverId: caregiver.id },
+      { where: { userId: dependent.id } }
+    );
+    
+    console.log(`✅ Updated ${updatedCount} accounts with caregiverId`);
+    
+    // Verify the update
+    const linkedAccounts = await Account.findAll({
+      where: { 
+        userId: dependent.id,
+        caregiverId: caregiver.id
+      }
+    });
+    
+    res.json({
+      success: true,
+      message: 'Caregiver-dependent relationship fixed successfully',
+      data: {
+        caregiverId: caregiver.id,
+        dependentId: dependent.id,
+        updatedAccounts: updatedCount,
+        linkedAccounts: linkedAccounts.length,
+        accountTypes: linkedAccounts.map(acc => acc.accountType)
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error fixing relationship:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fix relationship',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
