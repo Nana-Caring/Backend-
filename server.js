@@ -17,6 +17,10 @@ const accountRoutes = require('./routes/accountRoutes');
 const paymentCardRoutes = require('./routes/paymentCardRoutes');
 const transferRoutes = require('./routes/transferRoutes');
 const productRoutes = require('./routes/productRoutes');
+const cartRoutes = require('./routes/cart');
+const orderRoutes = require('./routes/orders');
+const categoryOrderRoutes = require('./routes/categoryOrders');
+const categoryAccountRoutes = require('./routes/categoryAccounts');
 
 
 const app = express();
@@ -51,6 +55,10 @@ app.use('/api/transfers', transferRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/portal', portalRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/cart', cartRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/category-orders', categoryOrderRoutes);
+app.use('/api/category-accounts', categoryAccountRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

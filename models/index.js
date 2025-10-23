@@ -39,6 +39,9 @@ const PaymentCard = require('./PaymentCard');
 const Transaction = require('./Transaction')(sequelize, Sequelize.DataTypes);
 const FunderDependent = require('./FunderDependent')(sequelize, Sequelize.DataTypes);
 const Product = require('./Product')(sequelize, Sequelize.DataTypes);
+const Cart = require('./Cart')(sequelize, Sequelize.DataTypes);
+const Order = require('./Order')(sequelize, Sequelize.DataTypes);
+const OrderItem = require('./OrderItem')(sequelize, Sequelize.DataTypes);
 
 const models = {
     User,
@@ -46,13 +49,16 @@ const models = {
     PaymentCard,
     Transaction,
     FunderDependent,
-    Product
+    Product,
+    Cart,
+    Order,
+    OrderItem
 };
 
 // Set up associations
 User.hasMany(Account, {
     foreignKey: 'userId',
-    as: 'accounts'
+    as: 'Accounts'
 });
 
 Account.belongsTo(User, {
@@ -145,6 +151,69 @@ Product.belongsTo(User, {
 Product.belongsTo(User, {
     foreignKey: 'updatedBy',
     as: 'updater'
+});
+
+// Cart associations
+Cart.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user'
+});
+
+Cart.belongsTo(Product, {
+    foreignKey: 'productId',
+    as: 'product'
+});
+
+User.hasMany(Cart, {
+    foreignKey: 'userId',
+    as: 'cartItems'
+});
+
+Product.hasMany(Cart, {
+    foreignKey: 'productId',
+    as: 'cartItems'
+});
+
+// Order associations
+Order.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user'
+});
+
+Order.belongsTo(Account, {
+    foreignKey: 'accountId',
+    as: 'account'
+});
+
+User.hasMany(Order, {
+    foreignKey: 'userId',
+    as: 'orders'
+});
+
+Account.hasMany(Order, {
+    foreignKey: 'accountId',
+    as: 'orders'
+});
+
+// OrderItem associations
+OrderItem.belongsTo(Order, {
+    foreignKey: 'orderId',
+    as: 'order'
+});
+
+OrderItem.belongsTo(Product, {
+    foreignKey: 'productId',
+    as: 'product'
+});
+
+Order.hasMany(OrderItem, {
+    foreignKey: 'orderId',
+    as: 'items'
+});
+
+Product.hasMany(OrderItem, {
+    foreignKey: 'productId',
+    as: 'orderItems'
 });
 
 // Test connection

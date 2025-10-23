@@ -57,6 +57,25 @@ Account.init({
       model: 'Users',
       key: 'id'
     }
+  },
+  category: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    comment: 'Account category for budget allocation (Healthcare, Transport, Education, Entertainment, Groceries, Other)'
+  },
+  isMainAccount: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    comment: 'Whether this is the main savings account that receives funder transfers'
+  },
+  allocatedFromId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'Accounts',
+      key: 'id'
+    },
+    comment: 'Reference to main account this category account was allocated from'
   }
 }, {
   sequelize,
@@ -77,6 +96,17 @@ Account.associate = function(models) {
   Account.belongsTo(models.User, {
     foreignKey: 'caregiverId',
     as: 'caregiver'
+  });
+  
+  // Self-referential association for category accounts allocated from main account
+  Account.belongsTo(models.Account, {
+    foreignKey: 'allocatedFromId',
+    as: 'mainAccount'
+  });
+  
+  Account.hasMany(models.Account, {
+    foreignKey: 'allocatedFromId',
+    as: 'categoryAccounts'
   });
   
   // Account has many Transactions

@@ -1,8 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const User = require("../models/User");
-const Account = require("../models/Account");
+const { User, Account } = require("../models");
 const { Sequelize, Op } = require('sequelize');
 // Email service removed - frontend handles UI
 // const generateUniqueAccountNumber = require('../utils/generateUniqueAccountNumber');
