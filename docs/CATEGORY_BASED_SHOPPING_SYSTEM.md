@@ -118,13 +118,15 @@ When category accounts are created, existing balances are distributed:
 
 ### Example Distribution
 ```
-Original Balance: R500.00
+Original Deposit: R500.00
 ├── Healthcare:    R125.00 (25%)
 ├── Groceries:     R150.00 (30%)
 ├── Education:     R100.00 (20%)
 ├── Transport:     R75.00  (15%)
 ├── Entertainment: R25.00  (5%)
 └── Other:         R25.00  (5%)
+
+Main Account Balance: R500.00 (Shows total of all category accounts)
 ```
 
 ## 🔄 Fund Transfer System

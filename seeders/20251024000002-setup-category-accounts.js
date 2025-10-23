@@ -69,10 +69,9 @@ module.exports = {
       // Insert category accounts
       await queryInterface.bulkInsert('Accounts', categoryAccountsData);
 
-      // Update main account balance to keep remainder
-      const remainingBalance = Math.round((currentBalance - totalAllocated) * 100) / 100;
+      // Update main account to display total of all category accounts (keep original total)
       await queryInterface.bulkUpdate('Accounts', {
-        balance: remainingBalance,
+        balance: currentBalance, // Keep the total amount for display
         updatedAt: new Date()
       }, {
         id: user.accountId

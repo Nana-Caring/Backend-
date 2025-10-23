@@ -1,23 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middlewares/auth');
-const bankAccountController = require('../controllers/bankAccountController');
+const directDepositController = require('../controllers/directDepositController');
 
-// Middleware to ensure only funders can access bank account routes
+// Middleware to ensure only funders can access deposit routes
 const requireFunder = (req, res, next) => {
   if (req.user.role !== 'funder') {
-    return res.status(403).json({ error: 'Only funders can manage bank accounts' });
+    return res.status(403).json({ error: 'Only funders can make direct deposits' });
   }
   next();
 };
 
-// Bank account management routes
-router.post('/add', auth, requireFunder, bankAccountController.addBankAccount);
-router.get('/', auth, requireFunder, bankAccountController.getBankAccounts);
-router.put('/:bankAccountId/default', auth, requireFunder, bankAccountController.setDefaultBankAccount);
-router.delete('/:bankAccountId', auth, requireFunder, bankAccountController.deleteBankAccount);
+// Direct deposit routes without storing payment methods
+router.post('/create-deposit-intent', auth, requireFunder, directDepositController.createDirectDepositIntent);
+router.post('/confirm-deposit', auth, requireFunder, directDepositController.confirmDirectDeposit);
+router.get('/deposit-history', auth, requireFunder, directDepositController.getDepositHistory);
 
-// Enhanced payment intent creation with bank account selection
-router.post('/payment-intent', auth, requireFunder, bankAccountController.createPaymentIntentWithBankAccount);
+// Get available deposit methods from Stripe (without storing)
+router.get('/payment-methods', auth, requireFunder, directDepositController.getAvailablePaymentMethods);
 
 module.exports = router;

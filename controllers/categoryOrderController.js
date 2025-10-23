@@ -32,6 +32,42 @@ const calculateCategoryTotal = (items) => {
   }, 0);
 };
 
+// Helper function to update main account with total of category accounts
+const updateMainAccountTotal = async (userId, transaction) => {
+  try {
+    const mainAccount = await Account.findOne({
+      where: { 
+        userId, 
+        isMainAccount: true,
+        status: 'active'
+      },
+      transaction
+    });
+
+    if (mainAccount) {
+      const categoryTotal = await Account.sum('balance', {
+        where: {
+          userId,
+          isMainAccount: false,
+          category: { [Op.ne]: null },
+          status: 'active'
+        },
+        transaction
+      });
+
+      await mainAccount.update({ 
+        balance: categoryTotal || 0 
+      }, { transaction });
+
+      return categoryTotal || 0;
+    }
+    return 0;
+  } catch (error) {
+    console.error('Error updating main account total:', error);
+    return 0;
+  }
+};
+
 // Create order from cart with category-based payment (checkout)
 const checkout = async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -274,6 +310,9 @@ const checkout = async (req, res) => {
       where: { id: { [Op.in]: cartItemIds } },
       transaction
     });
+
+    // Update main account to reflect new category totals after purchases
+    const newMainTotal = await updateMainAccountTotal(userId, transaction);
 
     await transaction.commit();
 
@@ -526,6 +565,9 @@ const cancelOrder = async (req, res) => {
       orderStatus: 'cancelled',
       cancelledAt: new Date()
     }, { transaction });
+
+    // Update main account to reflect new category totals after refunds
+    const newMainTotal = await updateMainAccountTotal(userId, transaction);
 
     await transaction.commit();
 

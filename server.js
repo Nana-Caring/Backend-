@@ -21,6 +21,7 @@ const cartRoutes = require('./routes/cart');
 const orderRoutes = require('./routes/orders');
 const categoryOrderRoutes = require('./routes/categoryOrders');
 const categoryAccountRoutes = require('./routes/categoryAccounts');
+const directDepositRoutes = require('./routes/bankAccountRoutes');
 
 
 const app = express();
@@ -59,6 +60,7 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/category-orders', categoryOrderRoutes);
 app.use('/api/category-accounts', categoryAccountRoutes);
+app.use('/api/direct-deposits', directDepositRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

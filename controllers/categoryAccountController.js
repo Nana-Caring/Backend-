@@ -50,6 +50,15 @@ const getCategoryBalances = async (req, res) => {
       }
     });
 
+    // Update main account balance to reflect total of category accounts
+    if (mainAccount && totalCategoryBalance !== parseFloat(mainAccount.balance)) {
+      await Account.update(
+        { balance: totalCategoryBalance },
+        { where: { id: mainAccount.id } }
+      );
+      mainAccount.balance = totalCategoryBalance.toString();
+    }
+
     // Sort category accounts alphabetically
     categoryAccounts.sort((a, b) => a.category.localeCompare(b.category));
 
@@ -58,15 +67,17 @@ const getCategoryBalances = async (req, res) => {
       data: {
         mainAccount: mainAccount ? {
           id: mainAccount.id,
-          balance: parseFloat(mainAccount.balance),
+          balance: totalCategoryBalance, // Always show total of category accounts
           accountName: mainAccount.accountName,
-          status: mainAccount.status
+          status: mainAccount.status,
+          note: "Displays total of all category accounts"
         } : null,
         categoryAccounts,
         summary: {
           totalCategoryBalance,
           totalAccounts: categoryAccounts.length,
-          categories: categoryAccounts.map(acc => acc.category)
+          categories: categoryAccounts.map(acc => acc.category),
+          balanceExplanation: "Main account shows sum of all category accounts"
         }
       }
     });
@@ -255,6 +266,38 @@ const transferBetweenCategories = async (req, res) => {
       }
     ], { transaction });
 
+    // Update main account to reflect new total after transfer
+    const mainAccount = await require('../models').Account.findOne({
+      where: { 
+        userId, 
+        isMainAccount: true,
+        status: 'active'
+      },
+      transaction
+    });
+
+    if (mainAccount) {
+      const newTotal = newFromBalance + newToBalance;
+      // Get total of all other category accounts
+      const otherCategories = await require('../models').Account.sum('balance', {
+        where: {
+          userId,
+          isMainAccount: false,
+          category: { 
+            [require('sequelize').Op.and]: [
+              { [require('sequelize').Op.ne]: null },
+              { [require('sequelize').Op.notIn]: [fromCategory.toLowerCase(), toCategory.toLowerCase()] }
+            ]
+          },
+          status: 'active'
+        },
+        transaction
+      });
+
+      const totalBalance = newTotal + (otherCategories || 0);
+      await mainAccount.update({ balance: totalBalance }, { transaction });
+    }
+
     await transaction.commit();
 
     res.json({
@@ -275,7 +318,11 @@ const transferBetweenCategories = async (req, res) => {
           amount: transferAmount,
           reference: transferRef,
           description: transferDescription
-        }
+        },
+        mainAccountUpdated: mainAccount ? {
+          newTotalBalance: mainAccount.balance,
+          note: "Main account updated to reflect category account totals"
+        } : null
       }
     });
 
