@@ -121,7 +121,7 @@ const getUserTransactions = async (req, res) => {
               include: [
                 {
                   model: OrderItem,
-                  as: 'orderItems',
+                  as: 'items',
                   attributes: ['quantity', 'priceAtOrder'],
                   include: [
                     {
@@ -139,8 +139,8 @@ const getUserTransactions = async (req, res) => {
                 orderNumber: order.orderNumber,
                 storeCode: order.storeCode,
                 status: order.orderStatus,
-                itemCount: order.orderItems?.length || 0,
-                items: order.orderItems?.map(item => ({
+                itemCount: order.items?.length || 0,
+                items: order.items?.map(item => ({
                   name: item.product?.name,
                   brand: item.product?.brand,
                   quantity: item.quantity,
@@ -367,7 +367,7 @@ const getTransactionDetails = async (req, res) => {
           include: [
             {
               model: OrderItem,
-              as: 'orderItems',
+              as: 'items',
               include: [
                 {
                   model: Product,
@@ -386,7 +386,7 @@ const getTransactionDetails = async (req, res) => {
             status: order.orderStatus,
             paymentStatus: order.paymentStatus,
             createdAt: order.createdAt,
-            items: order.orderItems.map(item => {
+            items: order.items.map(item => {
               let productSnapshot = {};
               try {
                 productSnapshot = JSON.parse(item.productSnapshot || '{}');

@@ -229,7 +229,7 @@ const checkout = async (req, res) => {
       include: [
         {
           model: OrderItem,
-          as: 'orderItems',
+          as: 'items',
           include: [{
             model: Product,
             as: 'product',
@@ -282,7 +282,7 @@ const getOrders = async (req, res) => {
       include: [
         {
           model: OrderItem,
-          as: 'orderItems',
+          as: 'items',
           include: [{
             model: Product,
             as: 'product',
@@ -332,7 +332,7 @@ const getOrderDetails = async (req, res) => {
       include: [
         {
           model: OrderItem,
-          as: 'orderItems',
+          as: 'items',
           include: [{
             model: Product,
             as: 'product',
@@ -360,7 +360,7 @@ const getOrderDetails = async (req, res) => {
     }
 
     // Parse product snapshots and merge with current product data
-    const enhancedOrderItems = order.orderItems.map(item => {
+    const enhancedOrderItems = order.items.map(item => {
       let productSnapshot = {};
       try {
         productSnapshot = JSON.parse(item.productSnapshot || '{}');
@@ -427,7 +427,7 @@ const getOrderByStoreCode = async (req, res) => {
       include: [
         {
           model: OrderItem,
-          as: 'orderItems',
+          as: 'items',
           include: [{
             model: Product,
             as: 'product',
@@ -453,7 +453,7 @@ const getOrderByStoreCode = async (req, res) => {
     }
 
     // Parse product snapshots for detailed display
-    const enhancedOrderItems = order.orderItems.map(item => {
+    const enhancedOrderItems = order.items.map(item => {
       let productSnapshot = {};
       try {
         productSnapshot = JSON.parse(item.productSnapshot || '{}');
