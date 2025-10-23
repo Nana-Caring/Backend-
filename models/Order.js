@@ -13,6 +13,12 @@ module.exports = (sequelize) => {
       allowNull: false,
       comment: 'Human-readable order number'
     },
+    storeCode: {
+      type: DataTypes.STRING(8),
+      unique: true,
+      allowNull: false,
+      comment: 'Unique 8-character code for in-store pickup/verification'
+    },
     userId: {
       type: DataTypes.INTEGER,
       allowNull: false,

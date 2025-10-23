@@ -10,6 +10,16 @@ const generateOrderNumber = () => {
   return `ORD${timestamp}${random}`;
 };
 
+// Generate unique 8-character store code
+const generateStoreCode = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+};
+
 // Create order from cart (checkout)
 const checkout = async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -55,13 +65,18 @@ const checkout = async (req, res) => {
       });
     }
 
-    // Get active cart items
+    // Get active cart items with complete product details
     const cartItems = await Cart.findAll({
       where: { userId, status: 'active' },
       include: [{
         model: Product,
         as: 'product',
-        attributes: ['id', 'name', 'brand', 'price', 'inStock', 'isActive']
+        attributes: [
+          'id', 'name', 'brand', 'price', 'inStock', 'isActive', 
+          'description', 'detailedDescription', 'category', 'subcategory',
+          'image', 'images', 'sku', 'ingredients', 'nutritionalInfo',
+          'allergens', 'weight', 'dimensions', 'manufacturer'
+        ]
       }],
       transaction
     });
@@ -128,8 +143,16 @@ const checkout = async (req, res) => {
 
     // Create order
     const orderNumber = generateOrderNumber();
+    let storeCode = generateStoreCode();
+    
+    // Ensure storeCode is unique
+    while (await Order.findOne({ where: { storeCode }, transaction })) {
+      storeCode = generateStoreCode();
+    }
+    
     const order = await Order.create({
       orderNumber,
+      storeCode,
       userId,
       accountId: account.id,
       totalAmount,
@@ -139,7 +162,7 @@ const checkout = async (req, res) => {
       shippingAddress: shippingAddress ? JSON.stringify(shippingAddress) : null
     }, { transaction });
 
-    // Create order items
+    // Create order items with detailed product snapshots
     const orderItemsData = validItems.map(({ cartItem, currentPrice }) => ({
       orderId: order.id,
       productId: cartItem.productId,
@@ -147,9 +170,23 @@ const checkout = async (req, res) => {
       priceAtOrder: currentPrice,
       subtotal: currentPrice * cartItem.quantity,
       productSnapshot: JSON.stringify({
+        id: cartItem.product.id,
         name: cartItem.product.name,
         brand: cartItem.product.brand,
-        image: cartItem.product.image
+        description: cartItem.product.description,
+        detailedDescription: cartItem.product.detailedDescription,
+        category: cartItem.product.category,
+        subcategory: cartItem.product.subcategory,
+        sku: cartItem.product.sku,
+        image: cartItem.product.image,
+        images: cartItem.product.images || [],
+        ingredients: cartItem.product.ingredients,
+        nutritionalInfo: cartItem.product.nutritionalInfo,
+        allergens: cartItem.product.allergens,
+        weight: cartItem.product.weight,
+        dimensions: cartItem.product.dimensions,
+        manufacturer: cartItem.product.manufacturer,
+        priceAtOrder: currentPrice
       })
     }));
 
@@ -249,7 +286,10 @@ const getOrders = async (req, res) => {
           include: [{
             model: Product,
             as: 'product',
-            attributes: ['name', 'brand', 'image']
+            attributes: [
+              'id', 'name', 'brand', 'category', 'subcategory',
+              'image', 'images', 'sku', 'description'
+            ]
           }]
         }
       ],
@@ -296,7 +336,12 @@ const getOrderDetails = async (req, res) => {
           include: [{
             model: Product,
             as: 'product',
-            attributes: ['id', 'name', 'brand', 'image', 'category']
+            attributes: [
+              'id', 'name', 'brand', 'category', 'subcategory',
+              'image', 'images', 'sku', 'description', 'detailedDescription',
+              'ingredients', 'nutritionalInfo', 'allergens', 'weight',
+              'dimensions', 'manufacturer', 'inStock', 'isActive'
+            ]
           }]
         },
         {
@@ -314,9 +359,48 @@ const getOrderDetails = async (req, res) => {
       });
     }
 
+    // Parse product snapshots and merge with current product data
+    const enhancedOrderItems = order.orderItems.map(item => {
+      let productSnapshot = {};
+      try {
+        productSnapshot = JSON.parse(item.productSnapshot || '{}');
+      } catch (e) {
+        console.warn('Failed to parse product snapshot for order item:', item.id);
+      }
+
+      return {
+        ...item.toJSON(),
+        productAtOrderTime: productSnapshot,
+        currentProduct: item.product,
+        displayProduct: {
+          ...productSnapshot,
+          // Use current product data if snapshot is incomplete
+          image: productSnapshot.image || item.product?.image,
+          images: productSnapshot.images || item.product?.images || [],
+          name: productSnapshot.name || item.product?.name,
+          brand: productSnapshot.brand || item.product?.brand,
+          description: productSnapshot.description || item.product?.description,
+          detailedDescription: productSnapshot.detailedDescription || item.product?.detailedDescription,
+          category: productSnapshot.category || item.product?.category,
+          subcategory: productSnapshot.subcategory || item.product?.subcategory,
+          sku: productSnapshot.sku || item.product?.sku
+        }
+      };
+    });
+
+    const orderWithDetails = {
+      ...order.toJSON(),
+      orderItems: enhancedOrderItems,
+      storeInstructions: {
+        code: order.storeCode,
+        message: `Present this code at checkout: ${order.storeCode}`,
+        note: 'This code verifies your order for in-store pickup'
+      }
+    };
+
     res.json({
       success: true,
-      data: order
+      data: orderWithDetails
     });
 
   } catch (error) {
@@ -324,6 +408,97 @@ const getOrderDetails = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve order details',
+      error: error.message
+    });
+  }
+};
+
+// Get order by store code (for in-store verification)
+const getOrderByStoreCode = async (req, res) => {
+  try {
+    const { storeCode } = req.params;
+    const userId = req.user.id;
+
+    const order = await Order.findOne({
+      where: { 
+        storeCode: storeCode.toUpperCase(),
+        userId // Ensure user can only access their own orders
+      },
+      include: [
+        {
+          model: OrderItem,
+          as: 'orderItems',
+          include: [{
+            model: Product,
+            as: 'product',
+            attributes: [
+              'id', 'name', 'brand', 'category', 'subcategory',
+              'image', 'images', 'sku', 'description', 'detailedDescription'
+            ]
+          }]
+        },
+        {
+          model: User,
+          as: 'user',
+          attributes: ['firstName', 'lastName', 'email']
+        }
+      ]
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found with provided store code'
+      });
+    }
+
+    // Parse product snapshots for detailed display
+    const enhancedOrderItems = order.orderItems.map(item => {
+      let productSnapshot = {};
+      try {
+        productSnapshot = JSON.parse(item.productSnapshot || '{}');
+      } catch (e) {
+        console.warn('Failed to parse product snapshot for order item:', item.id);
+      }
+
+      return {
+        ...item.toJSON(),
+        displayProduct: {
+          ...productSnapshot,
+          image: productSnapshot.image || item.product?.image,
+          images: productSnapshot.images || item.product?.images || [],
+          name: productSnapshot.name || item.product?.name,
+          brand: productSnapshot.brand || item.product?.brand,
+          description: productSnapshot.description || item.product?.description,
+          sku: productSnapshot.sku || item.product?.sku
+        }
+      };
+    });
+
+    const orderForStore = {
+      ...order.toJSON(),
+      orderItems: enhancedOrderItems,
+      verificationInfo: {
+        storeCode: order.storeCode,
+        customerName: `${order.user.firstName} ${order.user.lastName}`,
+        orderDate: order.createdAt,
+        orderStatus: order.orderStatus,
+        paymentStatus: order.paymentStatus,
+        totalAmount: order.totalAmount
+      }
+    };
+
+    res.json({
+      success: true,
+      data: orderForStore,
+      message: 'Order verified successfully'
+    });
+
+  } catch (error) {
+    console.error('Get order by store code error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify order',
       error: error.message
     });
   }
@@ -415,5 +590,6 @@ module.exports = {
   checkout,
   getOrders,
   getOrderDetails,
+  getOrderByStoreCode,
   cancelOrder
 };

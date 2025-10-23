@@ -6,6 +6,7 @@ const {
   checkout,
   getOrders,
   getOrderDetails,
+  getOrderByStoreCode,
   cancelOrder
 } = require('../controllers/orderController');
 
@@ -55,6 +56,13 @@ const validateOrderId = [
     .withMessage('Valid order ID is required')
 ];
 
+const validateStoreCode = [
+  param('storeCode')
+    .isLength({ min: 8, max: 8 })
+    .matches(/^[A-Z0-9]{8}$/)
+    .withMessage('Store code must be 8 alphanumeric characters')
+];
+
 const validateOrderQuery = [
   query('page')
     .optional()
@@ -93,6 +101,13 @@ router.get('/', validateOrderQuery, getOrders);
  * @access  Private (Dependents only)
  */
 router.get('/:id', validateOrderId, getOrderDetails);
+
+/**
+ * @route   GET /api/orders/store/:storeCode
+ * @desc    Get order details by store code (for in-store verification)
+ * @access  Private (Dependents only)
+ */
+router.get('/store/:storeCode', validateStoreCode, getOrderByStoreCode);
 
 /**
  * @route   POST /api/orders/:id/cancel
