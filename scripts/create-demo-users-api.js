@@ -1,7 +1,7 @@
 const axios = require('axios');
 require('dotenv').config({ path: '.env.production' });
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = process.env.PRODUCTION_URL ? `${process.env.PRODUCTION_URL}/api` : 'https://nanacaring-backend.onrender.com/api';
 
 // Demo users data
 const demoUsers = {

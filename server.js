@@ -102,9 +102,16 @@ app.use((err, req, res, next) => {
 app.get('/health', (req, res) => {
   res.json({
     success: true,
-    message: 'Server is healthy',
+    message: 'Nana Caring Backend is healthy',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.0.0',
+    features: {
+      orderSystem: 'Enhanced with store codes',
+      transactionTracking: 'Complete history and analytics',
+      paymentProcessing: 'Stripe integration ready',
+      userManagement: 'Multi-role system active'
+    }
   });
 });
 
