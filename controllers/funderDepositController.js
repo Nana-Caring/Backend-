@@ -119,14 +119,12 @@ exports.confirmDeposit = async (req, res) => {
       { transaction }
     );
 
-    // Create transaction record
+    // Create transaction record (using existing Credit type)
     await Transaction.create({
       accountId: funderAccount.id,
-      type: 'deposit',
+      type: 'Credit',
       amount: depositAmount,
-      balanceAfter: newBalance,
       description: `Stripe deposit - ${paymentIntentId}`,
-      status: 'completed',
       reference: paymentIntentId
     }, { transaction });
 
@@ -173,7 +171,7 @@ exports.getFunderAccount = async (req, res) => {
           as: 'transactions',
           limit: 10,
           order: [['createdAt', 'DESC']],
-          attributes: ['id', 'type', 'amount', 'balanceAfter', 'description', 'status', 'createdAt']
+          attributes: ['id', 'type', 'amount', 'description', 'createdAt']
         }
       ]
     });

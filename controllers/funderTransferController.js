@@ -97,28 +97,22 @@ exports.transferToBeneficiary = async (req, res) => {
     // Create transaction records
     const transferReference = `TRF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Funder debit transaction
+    // Funder debit transaction (using existing Debit type)
     await Transaction.create({
       accountId: funderAccount.id,
-      type: 'transfer_out',
-      amount: -amount,
-      balanceAfter: newFunderBalance,
+      type: 'Debit',
+      amount: amount, // Keep amount positive for now
       description: `Transfer to ${beneficiaryAccount.accountType} account - ${description}`,
-      status: 'completed',
-      reference: transferReference,
-      recipientAccountId: beneficiaryAccount.id
+      reference: transferReference
     }, { transaction });
 
-    // Beneficiary credit transaction
+    // Beneficiary credit transaction (using existing Credit type)
     await Transaction.create({
       accountId: beneficiaryAccount.id,
-      type: 'transfer_in',
+      type: 'Credit',
       amount: amount,
-      balanceAfter: newBeneficiaryBalance,
       description: `Transfer from funder - ${description}`,
-      status: 'completed',
-      reference: transferReference,
-      senderAccountId: funderAccount.id
+      reference: transferReference
     }, { transaction });
 
     await transaction.commit();
@@ -176,17 +170,17 @@ exports.getTransferHistory = async (req, res) => {
       });
     }
 
-    // Get transfer transactions
+    // Get transfer transactions (using existing types)
     const offset = (page - 1) * limit;
     const transfers = await Transaction.findAndCountAll({
       where: {
         accountId: funderAccount.id,
-        type: ['transfer_out', 'transfer_in', 'deposit']
+        type: ['Debit', 'Credit']
       },
       order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
       offset: offset,
-      attributes: ['id', 'type', 'amount', 'balanceAfter', 'description', 'status', 'reference', 'createdAt']
+      attributes: ['id', 'type', 'amount', 'description', 'reference', 'createdAt']
     });
 
     res.json({
