@@ -114,18 +114,6 @@ Account.associate = function(models) {
     foreignKey: 'accountId',
     as: 'transactions'
   });
-
-  // Account can receive transfers (as recipient)
-  Account.hasMany(models.Transaction, {
-    foreignKey: 'recipientAccountId',
-    as: 'receivedTransfers'
-  });
-
-  // Account can send transfers (as sender)
-  Account.hasMany(models.Transaction, {
-    foreignKey: 'senderAccountId',
-    as: 'sentTransfers'
-  });
   
   // Self-referencing for parent accounts
   Account.belongsTo(models.Account, {
