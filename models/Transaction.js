@@ -18,8 +18,33 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false
         },
         type: {
-            type: DataTypes.ENUM('Debit', 'Credit'),
+            type: DataTypes.ENUM('Debit', 'Credit', 'deposit', 'transfer_out', 'transfer_in'),
             allowNull: false
+        },
+        balanceAfter: {
+            type: DataTypes.FLOAT,
+            allowNull: true
+        },
+        status: {
+            type: DataTypes.ENUM('pending', 'completed', 'failed', 'cancelled'),
+            allowNull: false,
+            defaultValue: 'completed'
+        },
+        recipientAccountId: {
+            type: DataTypes.UUID,
+            allowNull: true,
+            references: {
+                model: 'Accounts',
+                key: 'id'
+            }
+        },
+        senderAccountId: {
+            type: DataTypes.UUID,
+            allowNull: true,
+            references: {
+                model: 'Accounts',
+                key: 'id'
+            }
         },
         description: {
             type: DataTypes.STRING,
@@ -48,6 +73,20 @@ module.exports = (sequelize, DataTypes) => {
             foreignKey: 'accountId',
             as: 'account',
             onDelete: 'CASCADE'
+        });
+
+        // Association for recipient account in transfers
+        Transaction.belongsTo(models.Account, {
+            foreignKey: 'recipientAccountId',
+            as: 'recipientAccount',
+            onDelete: 'SET NULL'
+        });
+
+        // Association for sender account in transfers
+        Transaction.belongsTo(models.Account, {
+            foreignKey: 'senderAccountId',
+            as: 'senderAccount',
+            onDelete: 'SET NULL'
         });
     };
 
