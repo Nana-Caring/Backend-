@@ -15,7 +15,7 @@ exports.getMyBeneficiaries = async (req, res) => {
             {
               model: db.Account,
               as: 'Accounts',
-              attributes: ['id', 'accountName', 'accountNumber', 'accountType', 'balance', 'caregiverId']
+              attributes: ['id', 'accountType', 'accountNumber', 'balance', 'caregiverId']
             }
           ]
         }
@@ -33,8 +33,12 @@ exports.getMyBeneficiaries = async (req, res) => {
       email: dep.email,
       phoneNumber: dep.phoneNumber,
       Accounts: (dep.Accounts || []).map(account => ({
-        ...account.toJSON(),
-        balance: `ZAR ${parseFloat(account.balance || 0).toFixed(2)}`
+        id: account.id,
+        accountName: account.accountType, // Using accountType as the display name
+        accountNumber: account.accountNumber,
+        accountType: account.accountType,
+        balance: `ZAR ${parseFloat(account.balance || 0).toFixed(2)}`,
+        caregiverId: account.caregiverId
       }))
     };
   });
