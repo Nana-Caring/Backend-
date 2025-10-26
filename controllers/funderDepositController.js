@@ -187,6 +187,7 @@ exports.getFunderAccount = async (req, res) => {
       data: {
         accountId: funderAccount.id,
         accountNumber: funderAccount.accountNumber,
+        accountName: funderAccount.accountType, // Account name same as account type
         accountType: funderAccount.accountType,
         balance: `ZAR ${parseFloat(funderAccount.balance || 0).toFixed(2)}`,
         rawBalance: parseFloat(funderAccount.balance || 0),

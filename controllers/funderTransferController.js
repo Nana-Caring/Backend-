@@ -62,14 +62,9 @@ exports.transferToBeneficiary = async (req, res) => {
       });
     }
 
-    // Get target beneficiary account
-    const beneficiaryAccount = await Account.findOne({
-      where: {
-        id: targetAccountId,
-        userId: beneficiaryId
-      },
-      transaction
-    });
+    // Get target beneficiary account by ID only
+    // We already verified the funder-beneficiary relationship above
+    const beneficiaryAccount = await Account.findByPk(targetAccountId, { transaction });
 
     if (!beneficiaryAccount) {
       await transaction.rollback();
@@ -130,6 +125,7 @@ exports.transferToBeneficiary = async (req, res) => {
         },
         beneficiary: {
           accountId: beneficiaryAccount.id,
+          accountName: beneficiaryAccount.accountType, // Account name same as account type
           accountType: beneficiaryAccount.accountType,
           newBalance: newBeneficiaryBalance
         }
