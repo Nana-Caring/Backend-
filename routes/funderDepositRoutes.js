@@ -5,7 +5,8 @@ const authenticate = require('../middlewares/auth');
 const {
   createDepositIntent,
   confirmDeposit,
-  getFunderAccount
+  getFunderAccount,
+  demoAddBalance
 } = require('../controllers/funderDepositController');
 
 // Middleware to check if user is a funder
@@ -64,5 +65,20 @@ router.post('/confirm', validateConfirmation, confirmDeposit);
  * @access  Private (Funders only)
  */
 router.get('/account', getFunderAccount);
+
+/**
+ * @route   POST /api/funder/deposit/demo-add-balance
+ * @desc    DEMO: Add balance for testing (simulates confirmed Stripe payment)
+ * @access  Private (Funders only) - DEMO ONLY
+ */
+router.post('/demo-add-balance', [
+  body('amount')
+    .isFloat({ min: 0.01 })
+    .withMessage('Amount must be greater than 0'),
+  body('description')
+    .optional()
+    .isLength({ max: 255 })
+    .withMessage('Description must be less than 255 characters')
+], demoAddBalance);
 
 module.exports = router;

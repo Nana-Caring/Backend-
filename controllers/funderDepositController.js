@@ -1,6 +1,5 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { User, Account, Transaction, sequelize } = require('../models');
-const { v4: uuidv4 } = require('uuid');
 
 /**
  * Create Stripe Payment Intent for Funder Deposit
@@ -200,6 +199,82 @@ exports.getFunderAccount = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve account information',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * DEMO ONLY: Add balance for testing purposes
+ * This simulates what would happen after Stripe payment confirmation
+ */
+exports.demoAddBalance = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  
+  try {
+    const { amount, description = 'Demo deposit' } = req.body;
+    const funderId = req.user.id;
+
+    // Validate amount
+    if (!amount || amount <= 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid amount'
+      });
+    }
+
+    // Get funder's account
+    const funderAccount = await Account.findOne({
+      where: {
+        userId: funderId,
+        accountType: 'Main'
+      },
+      transaction
+    });
+
+    if (!funderAccount) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Funder account not found'
+      });
+    }
+
+    // Update account balance
+    const newBalance = parseFloat(funderAccount.balance) + parseFloat(amount);
+    await funderAccount.update(
+      { balance: newBalance },
+      { transaction }
+    );
+
+    // Create transaction record
+    await Transaction.create({
+      accountId: funderAccount.id,
+      type: 'Credit',
+      amount: parseFloat(amount),
+      description: description,
+      reference: `DEMO-${Date.now()}`
+    }, { transaction });
+
+    await transaction.commit();
+
+    res.json({
+      success: true,
+      message: 'Demo balance added successfully',
+      data: {
+        amount: parseFloat(amount),
+        newBalance: newBalance,
+        currency: 'ZAR'
+      }
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Demo add balance error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add demo balance',
       error: error.message
     });
   }
