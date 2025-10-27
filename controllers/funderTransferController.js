@@ -7,7 +7,7 @@ exports.transferToBeneficiary = async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {
-    const { beneficiaryId, targetAccountId, amount, description = '' } = req.body;
+    const { beneficiaryId, accountNumber, amount, description = '' } = req.body;
     const funderId = req.user.id;
 
     // Validate amount
@@ -62,9 +62,15 @@ exports.transferToBeneficiary = async (req, res) => {
       });
     }
 
-    // Get target beneficiary account by ID only
+    // Get target beneficiary account by account number
     // We already verified the funder-beneficiary relationship above
-    const beneficiaryAccount = await Account.findByPk(targetAccountId, { transaction });
+    const beneficiaryAccount = await Account.findOne({
+      where: {
+        accountNumber: accountNumber,
+        userId: beneficiaryId
+      },
+      transaction
+    });
 
     if (!beneficiaryAccount) {
       await transaction.rollback();

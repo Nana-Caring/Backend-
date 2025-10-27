@@ -23,18 +23,11 @@ const validateTransfer = [
   body('beneficiaryId')
     .isInt({ min: 1 })
     .withMessage('Valid beneficiary ID is required'),
-  body('targetAccountId')
+  body('accountNumber')
     .notEmpty()
-    .withMessage('Target account ID is required')
-    .custom((value) => {
-      // Accept both integers and UUIDs
-      const isInteger = Number.isInteger(Number(value)) && Number(value) > 0;
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-      if (!isInteger && !isUUID) {
-        throw new Error('Target account ID must be a valid integer or UUID');
-      }
-      return true;
-    }),
+    .withMessage('Account number is required')
+    .isString()
+    .withMessage('Account number must be a string'),
   body('amount')
     .isFloat({ min: 0.01 })
     .withMessage('Amount must be greater than 0'),
