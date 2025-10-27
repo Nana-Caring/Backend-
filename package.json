@@ -45,6 +45,7 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "madge": "^8.0.0"
+    "madge": "^8.0.0",
+    "sequelize-cli": "^6.6.3"
   }
 }
