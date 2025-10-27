@@ -10,6 +10,33 @@ exports.transferToBeneficiary = async (req, res) => {
     const { beneficiaryId, accountNumber, amount, description = '' } = req.body;
     const funderId = req.user.id;
 
+    // Log the request body for debugging
+    console.log('Transfer request received:', {
+      beneficiaryId,
+      accountNumber,
+      amount,
+      description,
+      funderId
+    });
+
+    // Validate beneficiaryId
+    if (!beneficiaryId) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Beneficiary ID is required'
+      });
+    }
+
+    // Validate accountNumber
+    if (!accountNumber) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Account number is required'
+      });
+    }
+
     // Validate amount
     if (!amount || amount <= 0) {
       await transaction.rollback();
