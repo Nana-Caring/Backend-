@@ -8,4 +8,8 @@ router.post('/link-dependent', authMiddleware, funderController.linkDependent);
 
 //route to get all dependents of a funder
 router.get('/get-beneficiaries', authMiddleware, beneficiaryController.getMyBeneficiaries);
+
+// Alias route for beneficiaries (same as get-beneficiaries)
+router.get('/beneficiaries', authMiddleware, beneficiaryController.getMyBeneficiaries);
+
 module.exports = router;
