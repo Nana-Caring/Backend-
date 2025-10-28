@@ -1,9 +1,21 @@
 const { User, Account, Transaction, FunderDependent, sequelize } = require('../models');
+const { validationResult } = require('express-validator');
+const { Op } = require('sequelize');
 
 /**
  * Transfer funds from funder account to beneficiary account
  */
 exports.transferToBeneficiary = async (req, res) => {
+  // Check validation results from express-validator
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: errors.array()
+    });
+  }
+
   const transaction = await sequelize.transaction();
   
   try {
@@ -122,8 +134,12 @@ exports.transferToBeneficiary = async (req, res) => {
       { transaction }
     );
 
-    // Create transaction records
-    const transferReference = `TRF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // Create transaction records with unique references
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substr(2, 9);
+    const baseReference = `TRF-${timestamp}-${randomSuffix}`;
+    const debitReference = `${baseReference}-OUT`;
+    const creditReference = `${baseReference}-IN`;
 
     // Funder debit transaction (using existing Debit type)
     await Transaction.create({
@@ -131,7 +147,7 @@ exports.transferToBeneficiary = async (req, res) => {
       type: 'Debit',
       amount: amount, // Keep amount positive for now
       description: `Transfer to ${beneficiaryAccount.accountType} account - ${description}`,
-      reference: transferReference
+      reference: debitReference
     }, { transaction });
 
     // Beneficiary credit transaction (using existing Credit type)
@@ -140,8 +156,25 @@ exports.transferToBeneficiary = async (req, res) => {
       type: 'Credit',
       amount: amount,
       description: `Transfer from funder - ${description}`,
-      reference: transferReference
+      reference: creditReference
     }, { transaction });
+
+    // Check if we should auto-distribute funds to category accounts
+    let distributionDetails = null;
+    if (beneficiaryAccount.accountType === 'Main') {
+      try {
+        distributionDetails = await distributeToCategories(
+          beneficiaryAccount, 
+          amount, 
+          funderId, 
+          baseReference, 
+          transaction
+        );
+      } catch (distributionError) {
+        console.error('Auto-distribution failed:', distributionError);
+        // Continue without distribution - transfer still succeeded
+      }
+    }
 
     await transaction.commit();
 
@@ -149,7 +182,9 @@ exports.transferToBeneficiary = async (req, res) => {
       success: true,
       message: 'Transfer completed successfully',
       data: {
-        transferReference: transferReference,
+        transferReference: baseReference,
+        debitReference: debitReference,
+        creditReference: creditReference,
         amount: amount,
         currency: 'ZAR',
         funder: {
@@ -161,17 +196,35 @@ exports.transferToBeneficiary = async (req, res) => {
           accountName: beneficiaryAccount.accountType, // Account name same as account type
           accountType: beneficiaryAccount.accountType,
           newBalance: newBeneficiaryBalance
-        }
+        },
+        autoDistribution: distributionDetails
       }
     });
 
   } catch (error) {
     await transaction.rollback();
     console.error('Transfer to beneficiary error:', error);
+    console.error('Error name:', error.name);
+    console.error('Error stack:', error.stack);
+    
+    // Provide more specific error messages
+    let errorMessage = 'Failed to complete transfer';
+    if (error.name === 'SequelizeValidationError') {
+      errorMessage = 'Data validation failed: ' + error.errors.map(e => e.message).join(', ');
+    } else if (error.name === 'SequelizeUniqueConstraintError') {
+      errorMessage = 'Duplicate reference error - please try again';
+    } else if (error.name === 'SequelizeForeignKeyConstraintError') {
+      errorMessage = 'Invalid account reference';
+    }
+    
     res.status(500).json({
       success: false,
-      message: 'Failed to complete transfer',
-      error: error.message
+      message: errorMessage,
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? {
+        name: error.name,
+        stack: error.stack
+      } : undefined
     });
   }
 };
@@ -180,6 +233,16 @@ exports.transferToBeneficiary = async (req, res) => {
  * Get transfer history for a funder
  */
 exports.getTransferHistory = async (req, res) => {
+  // Check validation results from express-validator
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: errors.array()
+    });
+  }
+
   try {
     const funderId = req.user.id;
     const { page = 1, limit = 20 } = req.query;
@@ -232,5 +295,98 @@ exports.getTransferHistory = async (req, res) => {
       message: 'Failed to retrieve transfer history',
       error: error.message
     });
+  }
+};
+
+/**
+ * Helper function to distribute funds to category accounts automatically
+ * This ensures consistent allocation across all income sources
+ */
+const distributeToCategories = async (mainAccount, amount, funderId, transferReference, transaction) => {
+  try {
+    // Get all category accounts for this user (using accountType instead of category field)
+    const categoryAccounts = await Account.findAll({
+      where: {
+        userId: mainAccount.userId,
+        accountType: {
+          [Op.in]: ['Healthcare', 'Education', 'Entertainment', 'Groceries', 'Transport', 'Other', 'Clothing', 'Baby Care', 'Pregnancy']
+        },
+        status: 'active'
+      },
+      transaction
+    });
+
+    if (categoryAccounts.length === 0) {
+      return null; // No category accounts to distribute to
+    }
+
+    // Define distribution percentages based on importance/priority
+    const categoryAllocations = {
+      'Healthcare': 0.25,    // 25% - Medical needs (highest priority)
+      'Groceries': 0.20,     // 20% - Food & essentials (survival needs)
+      'Education': 0.20,     // 20% - Learning & development (future)
+      'Transport': 0.10,     // 10% - Mobility & access (daily needs)
+      'Entertainment': 0.05, // 5%  - Recreation & quality of life
+      'Clothing': 0.05,      // 5%  - Clothing & personal items
+      'Baby Care': 0.05,     // 5%  - Baby/child care needs
+      'Pregnancy': 0.05,     // 5%  - Pregnancy-related expenses
+      'Other': 0.05          // 5%  - Emergency & miscellaneous
+    };
+
+    // Distribute funds to each category
+    const distributions = [];
+    let totalDistributed = 0;
+    
+    for (const categoryAccount of categoryAccounts) {
+      const percentage = categoryAllocations[categoryAccount.accountType] || 0;
+      if (percentage > 0) {
+        const allocatedAmount = Math.round(amount * percentage * 100) / 100;
+        const newCategoryBalance = parseFloat(categoryAccount.balance) + allocatedAmount;
+
+        // Update category account balance
+        await categoryAccount.update({ 
+          balance: newCategoryBalance,
+          lastTransactionDate: new Date()
+        }, { transaction });
+
+        // Create transaction record for category allocation
+        const distributionReference = `${transferReference}-DIST-${categoryAccount.accountType.toUpperCase()}-${Date.now()}`;
+        await Transaction.create({
+          accountId: categoryAccount.id,
+          type: 'Credit',
+          amount: allocatedAmount,
+          description: `Auto-allocation from transfer (${Math.round(percentage * 100)}%) - ${transferReference}`,
+          reference: distributionReference
+        }, { transaction });
+
+        distributions.push({
+          category: categoryAccount.accountType,
+          accountId: categoryAccount.id,
+          percentage: Math.round(percentage * 100),
+          amount: allocatedAmount,
+          newBalance: newCategoryBalance
+        });
+
+        totalDistributed += allocatedAmount;
+      }
+    }
+
+    // Update main account balance to 0 since funds are now distributed
+    await mainAccount.update({ 
+      balance: 0,
+      lastTransactionDate: new Date()
+    }, { transaction });
+
+    return {
+      enabled: true,
+      totalAmount: amount,
+      totalDistributed: totalDistributed,
+      distributionReference: `${transferReference}-AUTODIST`,
+      categories: distributions
+    };
+
+  } catch (error) {
+    console.error('Error in distributeToCategories:', error);
+    throw error;
   }
 };
