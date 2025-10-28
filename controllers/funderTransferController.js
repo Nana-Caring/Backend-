@@ -309,7 +309,7 @@ const distributeToCategories = async (mainAccount, amount, funderId, transferRef
       where: {
         userId: mainAccount.userId,
         accountType: {
-          [Op.in]: ['Healthcare', 'Education', 'Entertainment', 'Groceries', 'Transport', 'Other', 'Clothing', 'Baby Care', 'Pregnancy']
+          [Op.in]: ['Healthcare', 'Education', 'Entertainment', 'Groceries', 'Transport', 'Clothing', 'Baby Care', 'Pregnancy']
         },
         status: 'active'
       },
@@ -321,17 +321,20 @@ const distributeToCategories = async (mainAccount, amount, funderId, transferRef
     }
 
     // Define distribution percentages based on importance/priority
+    // 80% distributed to categories, 20% kept in Main account as emergency savings
     const categoryAllocations = {
-      'Healthcare': 0.25,    // 25% - Medical needs (highest priority)
-      'Groceries': 0.20,     // 20% - Food & essentials (survival needs)
-      'Education': 0.20,     // 20% - Learning & development (future)
-      'Transport': 0.10,     // 10% - Mobility & access (daily needs)
-      'Entertainment': 0.05, // 5%  - Recreation & quality of life
-      'Clothing': 0.05,      // 5%  - Clothing & personal items
-      'Baby Care': 0.05,     // 5%  - Baby/child care needs
-      'Pregnancy': 0.05,     // 5%  - Pregnancy-related expenses
-      'Other': 0.05          // 5%  - Emergency & miscellaneous
+      'Healthcare': 0.20,    // 20% - Medical needs (highest priority)
+      'Groceries': 0.16,     // 16% - Food & essentials (survival needs)
+      'Education': 0.16,     // 16% - Learning & development (future)
+      'Transport': 0.08,     // 8%  - Mobility & access (daily needs)
+      'Entertainment': 0.04, // 4%  - Recreation & quality of life
+      'Clothing': 0.04,      // 4%  - Clothing & personal items
+      'Baby Care': 0.04,     // 4%  - Baby/child care needs
+      'Pregnancy': 0.08      // 8%  - Pregnancy-related expenses (increased)
     };
+    
+    // Emergency fund: 20% stays in Main account
+    const emergencyFundPercentage = 0.20;
 
     // Distribute funds to each category
     const distributions = [];
@@ -371,16 +374,35 @@ const distributeToCategories = async (mainAccount, amount, funderId, transferRef
       }
     }
 
-    // Update main account balance to 0 since funds are now distributed
+    // Calculate emergency fund amount (20% stays in Main account)
+    const emergencyFundAmount = Math.round(amount * emergencyFundPercentage * 100) / 100;
+    const newMainBalance = parseFloat(mainAccount.balance) + emergencyFundAmount;
+    
+    // Update main account balance to keep emergency fund
     await mainAccount.update({ 
-      balance: 0,
+      balance: newMainBalance,
       lastTransactionDate: new Date()
+    }, { transaction });
+    
+    // Create transaction record for emergency fund
+    const emergencyFundReference = `${transferReference}-EMERGENCY-${Date.now()}`;
+    await Transaction.create({
+      accountId: mainAccount.id,
+      type: 'Credit',
+      amount: emergencyFundAmount,
+      description: `Emergency fund allocation (${Math.round(emergencyFundPercentage * 100)}%) - ${transferReference}`,
+      reference: emergencyFundReference
     }, { transaction });
 
     return {
       enabled: true,
       totalAmount: amount,
       totalDistributed: totalDistributed,
+      emergencyFund: {
+        amount: emergencyFundAmount,
+        percentage: Math.round(emergencyFundPercentage * 100),
+        newMainBalance: newMainBalance
+      },
       distributionReference: `${transferReference}-AUTODIST`,
       categories: distributions
     };

@@ -209,10 +209,10 @@ exports.registerDependent = async (req, res) => {
       accountNumber: mainAccountNumber,
     });
 // main account, baby care account, entertainment account, clothing account,
-//  savings account, pregnancy account (no restrictions)
+//  pregnancy account (no restrictions)
 
     // Create sub-accounts for dependent
-    const subAccountTypes = ['Education', 'Healthcare', 'Clothing', 'Entertainment','Baby Care','Pregnancy' ,'Savings' ];
+    const subAccountTypes = ['Education', 'Healthcare', 'Clothing', 'Entertainment','Baby Care','Pregnancy'];
     const subAccounts = await Promise.all(
       subAccountTypes.map(async (type) => {
         const subAccountNumber = await generateUniqueAccountNumber();
@@ -226,13 +226,6 @@ exports.registerDependent = async (req, res) => {
         });
       })
     );
-
-    // Mirror savings balance to main account
-    const savingsAccount = subAccounts.find(acc => acc.accountType === 'Savings');
-    if (savingsAccount) {
-      mainAccount.balance = savingsAccount.balance;
-      await mainAccount.save();
-    }
 
     // Prepare response data
     const dependentResponse = {

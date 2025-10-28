@@ -16,13 +16,12 @@ function generateTransactionRef() {
 
 // Default allocation percentages for sub-accounts
 const DEFAULT_SUB_ACCOUNT_ALLOCATIONS = {
-  'Education': 25,      // 25%
-  'Healthcare': 20,     // 20%
-  'Savings': 20,        // 20%
-  'Clothing': 15,       // 15%
-  'Baby Care': 10,      // 10%
-  'Entertainment': 5,   // 5%
-  'Pregnancy': 5        // 5%
+  'Healthcare': 25,     // 25% - Medical needs (highest priority)
+  'Education': 20,      // 20% - Learning & development
+  'Clothing': 20,       // 20% - Personal items (increased from 15%)
+  'Baby Care': 15,      // 15% - Child care needs (increased from 10%)
+  'Entertainment': 10,  // 10% - Recreation (increased from 5%)
+  'Pregnancy': 10       // 10% - Pregnancy expenses (increased from 5%)
   // Total: 100%
 };
 
