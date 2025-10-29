@@ -1,6 +1,7 @@
 const { User, Account, Transaction, FunderDependent, sequelize } = require('../models');
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
+const { createFundTransfer, createEnhancedTransaction } = require('../utils/enhancedTransactionUtils');
 
 /**
  * Transfer funds from funder account to beneficiary account
@@ -134,30 +135,20 @@ exports.transferToBeneficiary = async (req, res) => {
       { transaction }
     );
 
-    // Create transaction records with unique references
+    // Create enhanced transaction records with sender/recipient names
     const timestamp = Date.now();
     const randomSuffix = Math.random().toString(36).substr(2, 9);
     const baseReference = `TRF-${timestamp}-${randomSuffix}`;
-    const debitReference = `${baseReference}-OUT`;
-    const creditReference = `${baseReference}-IN`;
 
-    // Funder debit transaction (using existing Debit type)
-    await Transaction.create({
-      accountId: funderAccount.id,
-      type: 'Debit',
-      amount: amount, // Keep amount positive for now
-      description: `Transfer to ${beneficiaryAccount.accountType} account - ${description}`,
-      reference: debitReference
-    }, { transaction });
-
-    // Beneficiary credit transaction (using existing Credit type)
-    await Transaction.create({
-      accountId: beneficiaryAccount.id,
-      type: 'Credit',
+    // Create enhanced fund transfer transactions
+    const transferResult = await createFundTransfer({
+      fromAccountId: funderAccount.id,
+      toAccountId: beneficiaryAccount.id,
       amount: amount,
-      description: `Transfer from funder - ${description}`,
-      reference: creditReference
-    }, { transaction });
+      description: description || 'Fund transfer',
+      category: 'fund_transfer',
+      baseReference: baseReference
+    }, transaction);
 
     // Check if we should auto-distribute funds to category accounts
     let distributionDetails = null;
@@ -352,15 +343,17 @@ const distributeToCategories = async (mainAccount, amount, funderId, transferRef
           lastTransactionDate: new Date()
         }, { transaction });
 
-        // Create transaction record for category allocation
+        // Create enhanced transaction record for category allocation
         const distributionReference = `${transferReference}-DIST-${categoryAccount.accountType.toUpperCase()}-${Date.now()}`;
-        await Transaction.create({
+        await createEnhancedTransaction({
           accountId: categoryAccount.id,
           type: 'Credit',
           amount: allocatedAmount,
-          description: `Auto-allocation from transfer (${Math.round(percentage * 100)}%) - ${transferReference}`,
-          reference: distributionReference
-        }, { transaction });
+          description: `Smart distribution to ${categoryAccount.accountType} (${Math.round(percentage * 100)}%)`,
+          reference: distributionReference,
+          transactionCategory: 'smart_distribution',
+          senderAccountId: mainAccount.id
+        }, transaction);
 
         distributions.push({
           category: categoryAccount.accountType,
@@ -384,15 +377,17 @@ const distributeToCategories = async (mainAccount, amount, funderId, transferRef
       lastTransactionDate: new Date()
     }, { transaction });
     
-    // Create transaction record for emergency fund
+    // Create enhanced transaction record for emergency fund
     const emergencyFundReference = `${transferReference}-EMERGENCY-${Date.now()}`;
-    await Transaction.create({
+    await createEnhancedTransaction({
       accountId: mainAccount.id,
       type: 'Credit',
       amount: emergencyFundAmount,
-      description: `Emergency fund allocation (${Math.round(emergencyFundPercentage * 100)}%) - ${transferReference}`,
-      reference: emergencyFundReference
-    }, { transaction });
+      description: `Emergency fund allocation (${Math.round(emergencyFundPercentage * 100)}%)`,
+      reference: emergencyFundReference,
+      transactionCategory: 'emergency_fund',
+      senderAccountId: mainAccount.id
+    }, transaction);
 
     return {
       enabled: true,
