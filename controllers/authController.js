@@ -199,7 +199,7 @@ exports.registerDependent = async (req, res) => {
     // Generate unique account number for main account
     const mainAccountNumber = await generateUniqueAccountNumber();
 
-    // Create main account for dependent
+    // Create main account for dependent (serves as Emergency Fund)
     const mainAccount = await Account.create({
       userId: dependent.id,
       caregiverId: req.user.id, // Link to the caregiver who is registering this dependent
@@ -208,11 +208,19 @@ exports.registerDependent = async (req, res) => {
       parentAccountId: null,
       accountNumber: mainAccountNumber,
     });
-// main account, baby care account, entertainment account, clothing account,
-//  pregnancy account (no restrictions)
 
-    // Create sub-accounts for dependent
-    const subAccountTypes = ['Education', 'Healthcare', 'Clothing', 'Entertainment','Baby Care','Pregnancy'];
+    // Create 7 essential sub-accounts for dependent (Basic Needs Coverage)
+    // These accounts ensure all fundamental needs are met for the dependent
+    const subAccountTypes = [
+      'Healthcare',     // Medical services, medications, and health-related products
+      'Groceries',      // Food security - nutritious food and essentials
+      'Education',      // School fees, books, uniforms, and educational materials  
+      'Clothing',       // Clothing purchases and housing-related costs
+      'Baby Care',      // Strollers, milk, baby clothes, body care products
+      'Entertainment',  // Toys, movies, outings for children's development
+      'Pregnancy'       // Needs of mother and baby during pregnancy
+    ];
+    
     const subAccounts = await Promise.all(
       subAccountTypes.map(async (type) => {
         const subAccountNumber = await generateUniqueAccountNumber();
@@ -226,6 +234,12 @@ exports.registerDependent = async (req, res) => {
         });
       })
     );
+
+    // Log account creation for debugging
+    console.log(`✅ Created ${subAccounts.length + 1} accounts for dependent ${dependent.email}:`);
+    console.log(`  - 1 Main account (Savings/Emergency Fund): ${mainAccount.accountType}`);
+    console.log(`  - ${subAccounts.length} Sub-accounts: ${subAccounts.map(acc => acc.accountType).join(', ')}`);
+    console.log(`  - Total: ${subAccounts.length + 1}/8 accounts created (Basic Needs Coverage)`);
 
     // Prepare response data
     const dependentResponse = {
