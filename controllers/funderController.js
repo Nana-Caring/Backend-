@@ -142,6 +142,9 @@ exports.transferToBeneficiary = async (req, res) => {
       });
     }
 
+    // Generate unique reference for this transfer
+    const transferReference = `TRF-${Date.now()}-${funderId}-${beneficiaryUserId}`;
+
     // Perform the transfer
     await sequelize.transaction(async (t) => {
       // Deduct from funder
@@ -156,27 +159,47 @@ exports.transferToBeneficiary = async (req, res) => {
         transaction: t 
       });
 
-      // Record transaction
+      // Record debit transaction for funder's account
       await db.Transaction.create({
-        accountId: targetAccount.id,
-        transactionType: 'deposit',
+        accountId: funderAccount.id,
+        type: 'Debit', // Money going out of funder account
         amount: parseFloat(amount),
-        currency: currency,
-        description: description || `Transfer from funder to ${accountType} account`,
-        status: 'completed',
+        description: description || `Transfer to ${accountType} account`,
+        reference: `${transferReference}-DEBIT`,
         senderName: req.user.name || 'Funder',
         recipientName: `${accountType} Account`,
-        transactionMethod: 'funder_transfer'
+        transactionCategory: 'fund_transfer'
+      }, { transaction: t });
+
+      // Record credit transaction for beneficiary's account
+      await db.Transaction.create({
+        accountId: targetAccount.id,
+        type: 'Credit', // Money coming into beneficiary account
+        amount: parseFloat(amount),
+        description: description || `Transfer from funder to ${accountType} account`,
+        reference: `${transferReference}-CREDIT`,
+        senderName: req.user.name || 'Funder',
+        recipientName: `${accountType} Account`,
+        transactionCategory: 'fund_transfer'
       }, { transaction: t });
     });
 
     res.json({ 
+      success: true,
       message: 'Transfer completed successfully with smart distribution',
-      transferDetails: {
+      data: {
+        transferReference: transferReference,
         amount: parseFloat(amount),
         currency: currency,
         targetAccount: accountType,
-        beneficiaryId: beneficiaryUserId
+        beneficiaryId: beneficiaryUserId,
+        funder: {
+          newBalance: parseFloat(funderAccount.balance) - parseFloat(amount)
+        },
+        beneficiary: {
+          accountType: accountType,
+          newBalance: parseFloat(targetAccount.balance) + parseFloat(amount)
+        }
       }
     });
 
