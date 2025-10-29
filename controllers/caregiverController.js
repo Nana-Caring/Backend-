@@ -167,7 +167,7 @@ const getDependentById = async (req, res) => {
             include: [
                 {
                     model: Account,
-                    as: 'accounts',
+                    as: 'Accounts',  // ✅ Fixed: Use correct alias 'Accounts'
                     where: { caregiverId: caregiverId },
                     required: true,
                     include: [
@@ -286,13 +286,13 @@ const getCaregiverStats = async (req, res) => {
     try {
         const caregiverId = req.user.id;
 
-        // Get total dependents count
+        // Get total dependents count (using correct alias)
         const totalDependents = await User.count({
             where: { role: 'dependent' },
             include: [
                 {
                     model: Account, 
-                    as: 'accounts',
+                    as: 'Accounts',  // ✅ Fixed: Use correct alias 'Accounts' not 'accounts'
                     where: { caregiverId: caregiverId },
                     required: true
                 }
@@ -305,7 +305,7 @@ const getCaregiverStats = async (req, res) => {
             include: [
                 {
                     model: Account,
-                    as: 'accounts',
+                    as: 'Accounts',  // ✅ Fixed: Use correct alias 'Accounts'
                     where: { caregiverId: caregiverId },
                     required: true
                 }
@@ -317,7 +317,7 @@ const getCaregiverStats = async (req, res) => {
             include: [
                 {
                     model: Account,
-                    as: 'accounts',
+                    as: 'Accounts',  // ✅ Fixed: Use correct alias 'Accounts'
                     where: { caregiverId: caregiverId },
                     required: true
                 }
@@ -329,7 +329,7 @@ const getCaregiverStats = async (req, res) => {
             include: [
                 {
                     model: Account,
-                    as: 'accounts',
+                    as: 'Accounts',  // ✅ Fixed: Use correct alias 'Accounts'
                     where: { caregiverId: caregiverId },
                     required: true
                 }
@@ -341,7 +341,7 @@ const getCaregiverStats = async (req, res) => {
             include: [
                 {
                     model: Account,
-                    as: 'accounts',
+                    as: 'Accounts',  // ✅ Fixed: Use correct alias 'Accounts'
                     where: { caregiverId: caregiverId },
                     required: true
                 }
