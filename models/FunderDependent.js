@@ -15,5 +15,19 @@ module.exports = (sequelize, DataTypes) => {
     }
   });
 
+  FunderDependent.associate = function(models) {
+    // FunderDependent belongs to User (funder)
+    FunderDependent.belongsTo(models.User, {
+      foreignKey: 'funderId',
+      as: 'funder'
+    });
+    
+    // FunderDependent belongs to User (dependent)
+    FunderDependent.belongsTo(models.User, {
+      foreignKey: 'dependentId',
+      as: 'dependent'
+    });
+  };
+
   return FunderDependent;
 };
