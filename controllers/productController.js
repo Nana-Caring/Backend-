@@ -74,23 +74,38 @@ const getAllProducts = async (req, res) => {
   }
 };
 
-// Get product by ID
+// Get product by ID or SKU
 const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const product = await Product.findOne({
-      where: { 
-        id, 
+    // Check if the id parameter is numeric (actual ID) or string (SKU)
+    const isNumericId = !isNaN(parseInt(id)) && parseInt(id).toString() === id;
+    
+    let whereClause;
+    if (isNumericId) {
+      // Search by actual database ID
+      whereClause = { 
+        id: parseInt(id), 
         isActive: true 
-      },
+      };
+    } else {
+      // Search by SKU
+      whereClause = { 
+        sku: id, 
+        isActive: true 
+      };
+    }
+    
+    const product = await Product.findOne({
+      where: whereClause,
       attributes: { exclude: ['createdBy', 'updatedBy'] }
     });
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found'
+        message: `Product not found with ${isNumericId ? 'ID' : 'SKU'}: ${id}`
       });
     }
 
