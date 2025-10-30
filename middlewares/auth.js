@@ -12,7 +12,9 @@ const auth = async (req, res, next) => {
 
     // Extract and clean token
     const token = authHeader.replace('Bearer ', '').trim();
-    console.log('Received token:', token);
+    if (String(process.env.DEBUG_AUTH).toLowerCase() === 'true') {
+      console.log('Received token:', token);
+    }
 
     // Validate token format
     if (!token || !token.match(/^[A-Za-z0-9-_]*\.[A-Za-z0-9-_]*\.[A-Za-z0-9-_]*$/)) {

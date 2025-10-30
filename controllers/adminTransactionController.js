@@ -15,13 +15,35 @@ const {
 // Get all users with filtering
 const getAllUsers = async (req, res) => {
     try {
+        // Debug: list User associations to ensure alias matches
+        if (process.env.DEBUG_ADMIN?.toLowerCase() === 'true') {
+            try {
+                const assoc = User.associations || {};
+                console.log('User associations:', Object.keys(assoc));
+                Object.entries(assoc).forEach(([key, a]) => {
+                    console.log(` - ${key}: target=${a?.target?.name}, as=${a?.as}`);
+                });
+            } catch (e) {
+                console.log('User associations debug failed:', e?.message);
+            }
+        }
         const {
             status,
             role,
             search,
             sortBy = 'createdAt',
-            sortOrder = 'DESC'
+            sortOrder = 'DESC',
+            limit: limitRaw,
+            page: pageRaw
         } = req.query;
+
+        // Sanitize pagination and sorting
+        const allowedSortBy = new Set(['createdAt', 'updatedAt', 'firstName', 'surname', 'email', 'role', 'status']);
+        const sortKey = allowedSortBy.has(String(sortBy)) ? String(sortBy) : 'createdAt';
+        const sortDir = String(sortOrder).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+        const limit = Math.min(Math.max(parseInt(limitRaw ?? '25', 10) || 25, 1), 100);
+        const page = Math.max(parseInt(pageRaw ?? '1', 10) || 1, 1);
+        const offset = (page - 1) * limit;
 
         const whereClause = {};
 
@@ -44,7 +66,7 @@ const getAllUsers = async (req, res) => {
             ];
         }
 
-        const users = await User.findAll({
+        const users = await User.findAndCountAll({
             where: whereClause,
             attributes: [
                 'id', 'firstName', 'middleName', 'surname', 'email', 'role', 'status',
@@ -55,18 +77,25 @@ const getAllUsers = async (req, res) => {
             include: [
                 {
                     model: Account,
-                    as: 'accounts',
+                    as: 'Accounts',
                     attributes: ['id', 'accountNumber', 'accountType', 'balance', 'status']
                 }
             ],
-            order: [[sortBy, sortOrder.toUpperCase()]]
+            // Ensure correct total count when including hasMany associations
+            distinct: true,
+            order: [[sortKey, sortDir]],
+            limit,
+            offset
         });
 
         res.json({
             success: true,
             data: {
-                users: users,
-                total: users.length
+                users: users.rows,
+                total: users.count,
+                page,
+                pageCount: Math.ceil(users.count / limit),
+                limit
             }
         });
 
@@ -90,7 +119,7 @@ const getUserById = async (req, res) => {
             include: [
                 {
                     model: Account,
-                    as: 'accounts',
+                    as: 'Accounts',
                     attributes: ['id', 'accountNumber', 'accountType', 'balance', 'currency', 'status']
                 }
             ]
@@ -422,7 +451,7 @@ const deleteUser = async (req, res) => {
             include: [
                 {
                     model: Account,
-                    as: 'accounts'
+                    as: 'Accounts'
                 }
             ]
         });
@@ -464,7 +493,7 @@ const deleteUser = async (req, res) => {
         // Delete related data if requested
         if (deleteData) {
             // Delete transactions related to user's accounts
-            const accountIds = user.accounts.map(acc => acc.id);
+            const accountIds = (user.Accounts || []).map(acc => acc.id);
             if (accountIds.length > 0) {
                 await Transaction.destroy({
                     where: { accountId: { [Op.in]: accountIds } }
