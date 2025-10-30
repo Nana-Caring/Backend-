@@ -9,7 +9,9 @@
     "production": "set NODE_ENV=production && node server.js",
     "migrate:prod": "NODE_ENV=production npx sequelize-cli db:migrate",
     "migrate:undo:prod": "NODE_ENV=production npx sequelize-cli db:migrate:undo",
-    "seed:prod": "NODE_ENV=production npx sequelize-cli db:seed:all"
+    "seed:prod": "NODE_ENV=production npx sequelize-cli db:seed:all",
+    "list:idnumbers": "node scripts/list-idnumbers.js",
+    "scan:bad-ids": "node scripts/find-invalid-idnumbers.js"
   },
   "keywords": [],
   "author": "",
