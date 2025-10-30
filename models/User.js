@@ -39,7 +39,17 @@ const User = sequelize.define('User', {
   Idnumber: {
     type: DataTypes.STRING(13),
     allowNull: false,
-    unique: true
+    unique: true,
+    validate: {
+      // Must be exactly 13 numeric digits (South African ID format)
+      isThirteenDigits(value) {
+        if (value === null || value === undefined) return;
+        const trimmed = String(value).trim();
+        if (!/^\d{13}$/.test(trimmed)) {
+          throw new Error('Idnumber must be exactly 13 numeric digits');
+        }
+      }
+    }
   },
   relation: {
     type: DataTypes.STRING,

@@ -365,8 +365,14 @@ const getProductsForDependent = async (req, res) => {
     if (!ageInfo.isValid) {
       return res.status(400).json({
         success: false,
+        errorCode: 'INVALID_IDNUMBER',
         message: 'Invalid ID number - cannot determine age',
-        error: ageInfo.error
+        error: ageInfo.error,
+        dependent: {
+          id: dependent.id,
+          name: `${dependent.firstName} ${dependent.surname}`.trim(),
+          Idnumber: dependent.Idnumber
+        }
       });
     }
 
@@ -488,8 +494,14 @@ const validateProductAccess = async (req, res) => {
     if (!ageInfo.isValid) {
       return res.status(400).json({
         success: false,
+        errorCode: 'INVALID_IDNUMBER',
         message: 'Invalid ID number - cannot verify age',
-        error: ageInfo.error
+        error: ageInfo.error,
+        dependent: {
+          id: dependent.id,
+          name: `${dependent.firstName} ${dependent.surname}`.trim(),
+          Idnumber: dependent.Idnumber
+        }
       });
     }
 

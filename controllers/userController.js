@@ -144,9 +144,24 @@ exports.getUserProfile = async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
+        // Compute ID number validation status to help frontend surface issues early
+        let idNumberValid = false;
+        let idValidationError = null;
+        try {
+            const { calculateAgeFromSAId } = require('../utils/ageCalculator');
+            const info = user?.Idnumber ? calculateAgeFromSAId(String(user.Idnumber).trim()) : { isValid: false, error: 'Missing ID number' };
+            idNumberValid = !!info.isValid;
+            idValidationError = info.isValid ? null : (info.error || 'Invalid ID number');
+        } catch (e) {
+            idNumberValid = false;
+            idValidationError = 'Validation failed';
+        }
+
         res.status(200).json({
             message: "Profile retrieved successfully",
-            user: user
+            user: user,
+            idNumberValid,
+            idValidationError
         });
 
     } catch (error) {
