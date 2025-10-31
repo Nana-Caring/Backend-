@@ -502,6 +502,7 @@ exports.adminLogin = async (req, res) => {
   try {
     const { email, password, firstName, surname, middleName } = req.body;
 
+    // Check admin credentials
     if (
       email === process.env.ADMIN_EMAIL &&
       password === process.env.ADMIN_PASSWORD
@@ -535,9 +536,45 @@ exports.adminLogin = async (req, res) => {
           role: 'admin'
         }
       });
-    } else {
-      return res.status(401).json({ message: 'Invalid admin credentials' });
     }
+    
+    // Check High Court credentials
+    if (
+      email === process.env.HIGHCOURT_EMAIL &&
+      password === process.env.HIGHCOURT_PASSWORD
+    ) {
+      // Generate JWT token for highcourt (same privileges as admin)
+      const accessToken = jwt.sign(
+        { id: -1, role: 'highcourt' },
+        process.env.JWT_SECRET
+      );
+      const refreshToken = jwt.sign(
+        { id: -1, role: 'highcourt' },
+        process.env.JWT_REFRESH_SECRET
+      );
+
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+      });
+
+      return res.json({
+        accessToken,
+        jwt: accessToken,
+        user: {
+          id: -1,
+          firstName: firstName || 'High Court',
+          middleName: middleName || '',
+          surname: surname || 'Admin',
+          email: process.env.HIGHCOURT_EMAIL,
+          role: 'highcourt'
+        }
+      });
+    }
+    
+    return res.status(401).json({ message: 'Invalid admin credentials' });
   } catch (error) {
     console.error('Admin login error:', error);
     res.status(500).json({ error: 'Admin login failed' });

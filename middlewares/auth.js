@@ -44,6 +44,12 @@ const auth = async (req, res, next) => {
       return next();
     }
 
+    // Allow highcourt token (not in DB, same privileges as admin)
+    if (decoded.role === 'highcourt' && !decoded.portal) {
+      req.user = { id: -1, role: 'highcourt', email: process.env.HIGHCOURT_EMAIL, firstName: 'High Court' };
+      return next();
+    }
+
     // Check if regular user still exists
     const user = await User.findByPk(decoded.id);
     if (!user) {
