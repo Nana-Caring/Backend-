@@ -23,7 +23,9 @@ const {
   unsuspendUser,
   deleteUser,
   getUserStats,
-  checkExpiredSuspensions
+  checkExpiredSuspensions,
+  adminRegisterFunder,
+  adminRegisterCaregiver
 } = require('../controllers/adminTransactionController');
 const {
   getAllProducts,
@@ -49,6 +51,24 @@ router.get('/users/stats', authenticate, isAdmin, getUserStats);
 
 // Check and process expired suspensions
 router.post('/users/check-expired-suspensions', authenticate, isAdmin, checkExpiredSuspensions);
+
+// Admin register funder
+router.post('/users/register-funder', authenticate, isAdmin, [
+  check('firstName', 'First name is required').not().isEmpty(),
+  check('surname', 'Surname is required').not().isEmpty(),
+  check('email', 'Please include a valid email').isEmail(),
+  check('password', 'Password must be at least 6 characters').isLength({ min: 6 }),
+  check('Idnumber', 'Valid 13-digit numeric ID number required').isLength({ min: 13, max: 13 }).isNumeric(),
+], adminRegisterFunder);
+
+// Admin register caregiver
+router.post('/users/register-caregiver', authenticate, isAdmin, [
+  check('firstName', 'First name is required').not().isEmpty(),
+  check('surname', 'Surname is required').not().isEmpty(),
+  check('email', 'Please include a valid email').isEmail(),
+  check('password', 'Password must be at least 6 characters').isLength({ min: 6 }),
+  check('Idnumber', 'Valid 13-digit numeric ID number required').isLength({ min: 13, max: 13 }).isNumeric(),
+], adminRegisterCaregiver);
 
 // Get specific user by ID
 router.get('/users/:id', authenticate, isAdmin, getUserById);
