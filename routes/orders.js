@@ -16,6 +16,14 @@ const validateCheckout = [
     .optional()
     .isObject()
     .withMessage('Shipping address must be an object'),
+  body('address')
+    .optional()
+    .isLength({ min: 5, max: 200 })
+    .withMessage('Address must be between 5 and 200 characters'),
+  body('fulfillmentType')
+    .optional()
+    .isIn(['pickup', 'delivery'])
+    .withMessage('Invalid fulfillment type'),
   body('shippingAddress.fullName')
     .optional()
     .isLength({ min: 2, max: 100 })

@@ -25,7 +25,7 @@ const checkout = async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {
-    const { shippingAddress, paymentMethod = 'account_balance' } = req.body;
+    const { shippingAddress, address, fulfillmentType = 'pickup', paymentMethod = 'account_balance' } = req.body;
     const userId = req.user.id;
 
     // Validate input
@@ -141,6 +141,39 @@ const checkout = async (req, res) => {
       });
     }
 
+    // Prepare shipping/collection address (pickup-first)
+    let computedShipping = shippingAddress || null;
+    if (!computedShipping) {
+      // If flat address provided, map it
+      if (address && typeof address === 'string') {
+        computedShipping = {
+          fullName: `${req.user.firstName || user.firstName || ''} ${req.user.surname || user.surname || req.user.lastName || user.lastName || ''}`.trim(),
+          address1: address
+        };
+      } else {
+        // Fallback to user's saved addresses (home first, then postal)
+        const addrLine1 = user.homeAddressLine1 || user.postalAddressLine1 || null;
+        const addrLine2 = user.homeAddressLine2 || user.postalAddressLine2 || null;
+        const city = user.homeCity || user.postalCity || null;
+        const province = user.homeProvince || user.postalProvince || null;
+        const code = user.homeCode || user.postalCode || null;
+        if (addrLine1 || city || province || code) {
+          computedShipping = {
+            fullName: `${user.firstName} ${user.surname || user.lastName || ''}`.trim(),
+            address1: addrLine1 || undefined,
+            address2: addrLine2 || undefined,
+            city: city || undefined,
+            province: province || undefined,
+            postalCode: code || undefined
+          };
+        }
+      }
+    }
+    // Always embed fulfillmentType for clarity (even though we store in shippingAddress column)
+    if (computedShipping) {
+      computedShipping.fulfillmentType = fulfillmentType || 'pickup';
+    }
+
     // Create order
     const orderNumber = generateOrderNumber();
     let storeCode = generateStoreCode();
@@ -159,7 +192,7 @@ const checkout = async (req, res) => {
       paymentMethod,
       paymentStatus: 'pending',
       orderStatus: 'processing',
-      shippingAddress: shippingAddress ? JSON.stringify(shippingAddress) : null
+      shippingAddress: computedShipping ? JSON.stringify(computedShipping) : null
     }, { transaction });
 
     // Create order items with detailed product snapshots
@@ -239,7 +272,7 @@ const checkout = async (req, res) => {
         {
           model: User,
           as: 'user',
-          attributes: ['firstName', 'lastName', 'email']
+          attributes: ['firstName', 'surname', 'email']
         }
       ]
     });
@@ -249,6 +282,10 @@ const checkout = async (req, res) => {
       message: 'Order placed successfully',
       data: {
         order: completeOrder,
+        collection: {
+          mode: fulfillmentType || 'pickup',
+          pickupHint: computedShipping ? [computedShipping.city, computedShipping.province].filter(Boolean).join(', ') : null
+        },
         unavailableItems: unavailableItems.length > 0 ? unavailableItems : undefined
       }
     });
@@ -347,7 +384,7 @@ const getOrderDetails = async (req, res) => {
         {
           model: User,
           as: 'user',
-          attributes: ['firstName', 'lastName', 'email']
+          attributes: ['firstName', 'surname', 'email']
         }
       ]
     });
@@ -391,6 +428,14 @@ const getOrderDetails = async (req, res) => {
     const orderWithDetails = {
       ...order.toJSON(),
       orderItems: enhancedOrderItems,
+      collection: (() => {
+        let s = {};
+        try { s = JSON.parse(order.shippingAddress || '{}'); } catch {}
+        return {
+          mode: s.fulfillmentType || 'pickup',
+          pickupHint: [s.city, s.province].filter(Boolean).join(', ') || null
+        };
+      })(),
       storeInstructions: {
         code: order.storeCode,
         message: `Present this code at checkout: ${order.storeCode}`,
@@ -440,7 +485,7 @@ const getOrderByStoreCode = async (req, res) => {
         {
           model: User,
           as: 'user',
-          attributes: ['firstName', 'lastName', 'email']
+          attributes: ['firstName', 'surname', 'email']
         }
       ]
     });
@@ -475,16 +520,35 @@ const getOrderByStoreCode = async (req, res) => {
       };
     });
 
+    // Basic validity checks for in-store verification
+    const isValid = order.paymentStatus === 'completed'
+      && order.orderStatus !== 'cancelled'
+      && parseFloat(order.totalAmount) > 0
+      && enhancedOrderItems.length > 0;
+
+    const shipping = (() => { try { return JSON.parse(order.shippingAddress || '{}'); } catch { return {}; } })();
+
     const orderForStore = {
       ...order.toJSON(),
       orderItems: enhancedOrderItems,
       verificationInfo: {
         storeCode: order.storeCode,
-        customerName: `${order.user.firstName} ${order.user.lastName}`,
+        customerName: `${order.user.firstName} ${order.user.surname || ''}`.trim(),
         orderDate: order.createdAt,
         orderStatus: order.orderStatus,
         paymentStatus: order.paymentStatus,
-        totalAmount: order.totalAmount
+        totalAmount: order.totalAmount,
+        isValid,
+        reasons: isValid ? [] : [
+          order.paymentStatus !== 'completed' ? 'Payment not completed' : null,
+          order.orderStatus === 'cancelled' ? 'Order cancelled' : null,
+          !(parseFloat(order.totalAmount) > 0) ? 'Invalid order amount' : null,
+          enhancedOrderItems.length === 0 ? 'No items in order' : null
+        ].filter(Boolean)
+      },
+      collection: {
+        mode: (shipping && shipping.fulfillmentType) || 'pickup',
+        pickupHint: [shipping?.city, shipping?.province].filter(Boolean).join(', ') || null
       }
     };
 
