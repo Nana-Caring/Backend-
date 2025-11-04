@@ -79,10 +79,25 @@ const Product = sequelize.define('Product', {
     allowNull: true,
     comment: 'Product ingredients or specifications'
   },
+  nutritionalInfo: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    comment: 'Nutritional information per serving'
+  },
+  allergens: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    comment: 'Allergen information'
+  },
   weight: {
     type: DataTypes.STRING,
     allowNull: true,
     comment: 'Product weight or size'
+  },
+  dimensions: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'Product dimensions (e.g., L x W x H)'
   },
   manufacturer: {
     type: DataTypes.STRING,

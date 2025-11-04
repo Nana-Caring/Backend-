@@ -200,8 +200,8 @@ const checkout = async (req, res) => {
       orderId: order.id,
       productId: cartItem.productId,
       quantity: cartItem.quantity,
-      priceAtOrder: currentPrice,
-      subtotal: currentPrice * cartItem.quantity,
+      priceAtTime: currentPrice,
+      totalPrice: currentPrice * cartItem.quantity,
       productSnapshot: JSON.stringify({
         id: cartItem.product.id,
         name: cartItem.product.name,
@@ -219,7 +219,7 @@ const checkout = async (req, res) => {
         weight: cartItem.product.weight,
         dimensions: cartItem.product.dimensions,
         manufacturer: cartItem.product.manufacturer,
-        priceAtOrder: currentPrice
+        priceAtTime: currentPrice
       })
     }));
 
