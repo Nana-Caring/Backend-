@@ -233,7 +233,7 @@ const checkout = async (req, res) => {
     await Transaction.create({
       userId,
       accountId: account.id,
-      type: 'debit',
+      type: 'Debit',
       amount: totalAmount,
       description: `Purchase - Order ${orderNumber}`,
       category: 'purchase',

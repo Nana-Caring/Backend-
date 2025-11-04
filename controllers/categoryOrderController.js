@@ -284,7 +284,7 @@ const checkout = async (req, res) => {
       transactionRecords.push({
         userId,
         accountId: categoryAccount.id,
-        type: 'debit',
+        type: 'Debit',
         amount: categoryTotal,
         description: `Purchase - Order ${orderNumber} (${category})`,
         category: 'purchase',
