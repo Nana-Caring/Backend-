@@ -804,22 +804,50 @@ const getTransactionAnalytics = async (req, res) => {
             groupBy = 'day' // 'day', 'week', 'month'
         } = req.query;
 
+        // Validate and parse the period parameter
+        const parsedPeriod = parseInt(period);
+        if (isNaN(parsedPeriod) || parsedPeriod <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid period parameter. Must be a positive number.',
+                error: 'Period must be a valid positive integer'
+            });
+        }
+
         const startDate = new Date();
-        startDate.setDate(startDate.getDate() - parseInt(period));
+        startDate.setDate(startDate.getDate() - parsedPeriod);
+        
+        // Validate that startDate is valid
+        if (isNaN(startDate.getTime())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid date calculation',
+                error: 'Failed to calculate start date from period'
+            });
+        }
 
         // Build filters
         let accountWhere = { caregiverId: caregiverId };
         let userWhere = { role: 'dependent' };
         
+        // Validate dependentId if provided
         if (dependentId) {
-            userWhere.id = dependentId;
+            const parsedDependentId = parseInt(dependentId);
+            if (isNaN(parsedDependentId) || parsedDependentId <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid dependentId parameter. Must be a positive number.',
+                    error: 'DependentId must be a valid positive integer'
+                });
+            }
+            userWhere.id = parsedDependentId;
         }
 
         // Get transaction analytics
         const analytics = await Transaction.findAll({
             where: {
                 timestamp: {
-                    [Op.gte]: startDate
+                    [Op.gte]: startDate.toISOString()
                 }
             },
             include: [
@@ -895,12 +923,13 @@ const getTransactionAnalytics = async (req, res) => {
             success: true,
             message: 'Transaction analytics retrieved successfully',
             data: {
-                period: `${period} days`,
+                period: `${parsedPeriod} days`,
+                startDate: startDate.toISOString().split('T')[0], // Include readable start date
                 overallTotals,
                 dailyBreakdown: Object.values(groupedData),
                 summary: {
-                    averageDailyCredits: overallTotals.totalCredits / parseInt(period),
-                    averageDailyDebits: overallTotals.totalDebits / parseInt(period),
+                    averageDailyCredits: overallTotals.totalCredits / parsedPeriod,
+                    averageDailyDebits: overallTotals.totalDebits / parsedPeriod,
                     averageTransactionSize: overallTotals.totalTransactions > 0 ? 
                         (overallTotals.totalCredits + overallTotals.totalDebits) / overallTotals.totalTransactions : 0
                 }
