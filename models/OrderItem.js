@@ -33,15 +33,15 @@ module.exports = (sequelize) => {
       },
       comment: 'Quantity ordered'
     },
-    priceAtOrder: {
+    priceAtTime: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
       comment: 'Price per unit at time of order'
     },
-    subtotal: {
+    totalPrice: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
-      comment: 'Total price for this line item (quantity * priceAtOrder)'
+      comment: 'Total price for this line item (quantity * priceAtTime)'
     },
     productSnapshot: {
       type: DataTypes.TEXT,
