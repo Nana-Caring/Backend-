@@ -122,7 +122,7 @@ const getUserTransactions = async (req, res) => {
                 {
                   model: OrderItem,
                   as: 'items',
-                  attributes: ['quantity', 'priceAtOrder'],
+                  attributes: ['quantity', 'priceAtTime'],
                   include: [
                     {
                       model: Product,
@@ -144,7 +144,7 @@ const getUserTransactions = async (req, res) => {
                   name: item.product?.name,
                   brand: item.product?.brand,
                   quantity: item.quantity,
-                  price: item.priceAtOrder,
+                  price: item.priceAtTime,
                   image: item.product?.image
                 })) || []
               };
@@ -401,8 +401,8 @@ const getTransactionDetails = async (req, res) => {
                 image: productSnapshot.image || item.product?.image,
                 sku: productSnapshot.sku || item.product?.sku,
                 quantity: item.quantity,
-                priceAtOrder: item.priceAtOrder,
-                subtotal: item.subtotal
+                priceAtTime: item.priceAtTime,
+                totalPrice: item.totalPrice
               };
             })
           };

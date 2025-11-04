@@ -266,8 +266,8 @@ const checkout = async (req, res) => {
           orderId: order.id,
           productId: cartItem.productId,
           quantity: cartItem.quantity,
-          priceAtOrder: cartItem.priceAtTime,
-          subtotal: itemTotal,
+          priceAtTime: cartItem.priceAtTime,
+          totalPrice: itemTotal,
           productSnapshot: JSON.stringify({
             name: cartItem.product.name,
             brand: cartItem.product.brand,
