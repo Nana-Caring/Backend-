@@ -46,7 +46,7 @@ module.exports = (sequelize) => {
       comment: 'Total order amount'
     },
     orderStatus: {
-      type: DataTypes.ENUM('processing', 'confirmed', 'shipped', 'delivered', 'cancelled'),
+      type: DataTypes.ENUM('processing', 'confirmed', 'ready_for_pickup', 'shipped', 'delivered', 'cancelled'),
       defaultValue: 'processing',
       comment: 'Order status'
     },

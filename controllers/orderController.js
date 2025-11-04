@@ -739,7 +739,7 @@ const markCollected = async (req, res) => {
         attributes: ['firstName', 'surname', 'email']
       }, {
         model: OrderItem,
-        as: 'orderItems',
+        as: 'items',
         attributes: ['quantity', 'priceAtTime', 'totalPrice', 'productSnapshot']
       }],
       transaction
@@ -785,7 +785,7 @@ const markCollected = async (req, res) => {
           collectionMethod: collectionMethod,
           customerName: `${order.user.firstName} ${order.user.surname}`,
           totalAmount: order.totalAmount,
-          itemCount: order.orderItems?.length || 0,
+          itemCount: order.items?.length || 0,
           notes: notes
         }
       }
@@ -815,7 +815,7 @@ const getPendingOrders = async (req, res) => {
         attributes: ['firstName', 'surname', 'Idnumber']
       }, {
         model: OrderItem,
-        as: 'orderItems',
+        as: 'items',
         attributes: ['quantity', 'priceAtTime', 'productSnapshot']
       }],
       order: [['createdAt', 'DESC']],
@@ -832,7 +832,7 @@ const getPendingOrders = async (req, res) => {
         customerName: `${order.user.firstName} ${order.user.surname}`,
         customerAge: calculateAge(order.user.Idnumber),
         totalAmount: order.totalAmount,
-        itemCount: order.orderItems?.length || 0,
+        itemCount: order.items?.length || 0,
         orderStatus: order.orderStatus,
         createdAt: order.createdAt,
         confirmedAt: order.confirmedAt
