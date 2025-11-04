@@ -55,6 +55,51 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true
   },
+  // Pregnancy/Infant support fields
+  isPregnant: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  },
+  expectedDueDate: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  isInfant: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  },
+  isUnborn: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  },
+  dateOfBirth: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  parentCaregiverId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
+  },
+  calculatedAge: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      const dob = this.getDataValue('dateOfBirth');
+      if (!dob) return null;
+      const today = new Date();
+      const birth = new Date(dob);
+      let age = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+      return Math.max(0, age);
+    }
+  },
   // User blocking/status fields
   isBlocked: {
     type: DataTypes.BOOLEAN,

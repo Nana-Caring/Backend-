@@ -1,0 +1,151 @@
+{
+  "scrapingDate": "2025-11-03T23:02:45.967Z",
+  "totalProducts": 32,
+  "successfullyScraped": 24,
+  "failedToScrape": 8,
+  "successRate": "75.0%",
+  "sourceBreakdown": {
+    "takealot": 0,
+    "amazon": 24
+  },
+  "failedProducts": [
+    {
+      "name": "Khoki Permanent Markers Set of 4",
+      "brand": "Khoki",
+      "category": "Education"
+    },
+    {
+      "name": "Multivitamin Syrup for Children 200ml",
+      "brand": "Dis-Chem",
+      "category": "Healthcare"
+    },
+    {
+      "name": "Tommee Tippee Baby Bottle 260ml",
+      "brand": "Tommee Tippee",
+      "category": "Healthcare"
+    },
+    {
+      "name": "All Gold Tomato Sauce 500ml",
+      "brand": "All Gold",
+      "category": "Groceries"
+    },
+    {
+      "name": "Lucky Star Pilchards in Tomato Sauce 400g",
+      "brand": "Lucky Star",
+      "category": "Groceries"
+    },
+    {
+      "name": "Ritebrand Brown Bread 700g",
+      "brand": "Ritebrand",
+      "category": "Groceries"
+    },
+    {
+      "name": "White Star Super Maize Meal 2.5kg",
+      "brand": "White Star",
+      "category": "Groceries"
+    },
+    {
+      "name": "Woolworths Organic Baby Food Pouches 6-Pack",
+      "brand": "Woolworths",
+      "category": "Groceries"
+    }
+  ],
+  "scrapedProducts": [
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/61LpbPZg9-L._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/719D9sIj3-L._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71x6qEn52DL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71mfvGQFlML._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71Nziyc+DEL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/61ZT1ZkpXEL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/710hvW2Q-DL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/81n3CRLgMqL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/G/01/HST/Search/HVAWidgetIPD3/HVA-Search-Widget_OM-Exam.png"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/31MAxjf0DqL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/G/01/HST/Search/HVAWidgetIPD3/HVA-Search-Widget_OM-Exam.png"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/81pFlntG2fL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/G/01/HST/Search/HVAWidgetIPD3/HVA-Search-Widget_OM-Exam.png"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/61RRaiLGWvL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71S4A1R+w8L._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71V8yVZRLSL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71LPWW83ycL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/81Vr2u-LenL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/51A+x6Y0HBL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71p4shLwDiL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71RqDOsKnoL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/81r+Y1Q3alL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71NHneq0DiL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71AjZeBXFbL._SL1500_.jpg"
+    }
+  ]
+}

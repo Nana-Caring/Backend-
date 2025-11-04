@@ -9,6 +9,7 @@ const getAllProducts = async (req, res) => {
     const {
       category,
       brand,
+      shop,
       inStock,
       isActive = true,
       search,
@@ -31,6 +32,11 @@ const getAllProducts = async (req, res) => {
     // Apply filters
     if (category) where.category = category;
     if (brand) where.brand = brand;
+    // Optional shop filter (case-insensitive)
+    if (shop) {
+      const { Op } = require('sequelize');
+      where.shop = { [Op.iLike]: shop };
+    }
     if (inStock !== undefined) where.inStock = inStock === 'true';
 
     // Search functionality
@@ -253,7 +259,7 @@ const getProductsByCategory = async (req, res) => {
   try {
     const { category } = req.params;
     
-    const validCategories = ['Education', 'Healthcare', 'Groceries', 'Transport', 'Entertainment', 'Other'];
+    const validCategories = ['Education', 'Healthcare', 'Groceries', 'Entertainment', 'Other', 'Pregnancy'];
     if (!validCategories.includes(category)) {
       return res.status(400).json({
         success: false,

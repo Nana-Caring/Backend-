@@ -26,6 +26,7 @@ const directDepositRoutes = require('./routes/bankAccountRoutes');
 const transactionRoutes = require('./routes/transactions');
 const funderDepositRoutes = require('./routes/funderDepositRoutes');
 const funderTransferRoutes = require('./routes/funderTransferRoutes');
+const pregnancyRoutes = require('./routes/pregnancy');
 
 
 const app = express();
@@ -82,6 +83,7 @@ app.use('/api/direct-deposits', directDepositRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/funder/deposit', funderDepositRoutes);
 app.use('/api/funder/transfer', funderTransferRoutes);
+app.use('/api/pregnancy', pregnancyRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

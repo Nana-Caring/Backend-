@@ -2,7 +2,8 @@ const express = require("express");
 const { check, validationResult } = require("express-validator");
 const rateLimit = require("express-rate-limit");
 const { register, login, getUser, registerDependent, adminLogin, verifyResetToken } = require("../controllers/authController");
-const authMiddleware = require("../middlewares/auth");
+const { authenticateToken } = require("../middlewares/auth");
+const authMiddleware = authenticateToken; // For backward compatibility
 
 
 const router = express.Router();
