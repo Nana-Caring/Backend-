@@ -1,4 +1,7 @@
-@echo off
+✅ Checkout successful
+📋 Order Number: ORD1762240466684451
+🏪 Store Code: DM9QL5MF
+📝 Instructions: "Present this code at checkout"@echo off
 REM Order System Test Runner for Windows
 REM Runs comprehensive tests for the NANA Project order system
 

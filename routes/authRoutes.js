@@ -1,7 +1,7 @@
 const express = require("express");
 const { check, validationResult } = require("express-validator");
 const rateLimit = require("express-rate-limit");
-const { register, login, getUser, registerDependent, adminLogin, verifyResetToken } = require("../controllers/authController");
+const { register, login, getUser, registerDependent, adminLogin, verifyResetToken, retailerLogin } = require("../controllers/authController");
 const { authenticateToken } = require("../middlewares/auth");
 const authMiddleware = authenticateToken; // For backward compatibility
 
@@ -20,6 +20,17 @@ router.post(
 
 // ADMIN LOGIN
 router.post("/admin-login", adminLogin);
+
+// RETAILER LOGIN
+router.post(
+  "/retailer-login",
+  [
+    check("email", "Include a valid email").isEmail(),
+    check("password", "Password is required").exists(),
+    check("storeId", "Store ID is optional").optional().isString()
+  ],
+  retailerLogin
+);
 
 // REGISTER (Funder or Caregiver)
 router.post(

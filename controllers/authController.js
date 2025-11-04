@@ -546,6 +546,105 @@ exports.login = async (req, res) => {
 }
 };
 
+// Retailer login - specialized for POS store staff
+exports.retailerLogin = async (req, res) => {
+  try {
+    const { email, password, storeId } = req.body;
+
+    // Find retailer user by email
+    const retailer = await User.findOne({ 
+      where: { 
+        email,
+        role: 'retailer'
+      },
+      attributes: [
+        'id', 'firstName', 'middleName', 'surname', 'email', 
+        'password', 'role', 'Idnumber', 'createdAt', 'updatedAt'
+      ]
+    });
+
+    if (!retailer) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Invalid retailer credentials or account not found' 
+      });
+    }
+
+    // Check password
+    const isValidPassword = await bcrypt.compare(password, retailer.password);
+    if (!isValidPassword) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Invalid retailer credentials' 
+      });
+    }
+
+    // Generate JWT token with retailer-specific payload
+    const accessToken = jwt.sign(
+      { 
+        id: retailer.id, 
+        role: retailer.role,
+        storeId: storeId || 'main_store',
+        retailerAccess: true
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '12h' } // Longer session for store staff
+    );
+
+    const refreshToken = jwt.sign(
+      { 
+        id: retailer.id,
+        role: retailer.role
+      },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Set refresh token in httpOnly, secure cookie
+    res.cookie('retailerRefreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    // Retailer-specific response
+    const response = {
+      success: true,
+      message: 'Retailer login successful',
+      accessToken,
+      jwt: accessToken,
+      retailer: {
+        id: retailer.id,
+        firstName: retailer.firstName,
+        middleName: retailer.middleName,
+        surname: retailer.surname,
+        email: retailer.email,
+        role: retailer.role,
+        storeId: storeId || 'main_store',
+        loginTime: new Date().toISOString()
+      },
+      permissions: [
+        'view_pending_orders',
+        'confirm_pickup',
+        'mark_collected',
+        'view_order_details'
+      ]
+    };
+
+    console.log(`✅ Retailer login successful: ${retailer.email} at store ${storeId || 'main_store'}`);
+    res.json(response);
+
+  } catch (error) {
+    console.error('Retailer login error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Retailer login failed', 
+      details: error.message 
+    });
+  }
+};
+
 exports.refreshToken = (req, res) => {
   const token = req.cookies.refreshToken;
   if (!token) return res.status(401).json({ message: 'No refresh token' });

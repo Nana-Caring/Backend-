@@ -650,10 +650,229 @@ const cancelOrder = async (req, res) => {
   }
 };
 
+// POS: Confirm order is picked/packed and ready for collection
+const confirmPickup = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  
+  try {
+    const { orderId } = req.params;
+    const { staffId, notes } = req.body;
+
+    // Find order
+    const order = await Order.findOne({
+      where: { id: orderId },
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['firstName', 'surname', 'email']
+      }],
+      transaction
+    });
+
+    if (!order) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Only processing orders can be confirmed
+    if (order.orderStatus !== 'processing') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Order status is ${order.orderStatus}, cannot confirm. Expected: processing`
+      });
+    }
+
+    // Update order status
+    await order.update({
+      orderStatus: 'ready_for_pickup',
+      confirmedAt: new Date(),
+      fulfillmentNotes: notes || `Confirmed by staff: ${staffId}`
+    }, { transaction });
+
+    await transaction.commit();
+
+    res.json({
+      success: true,
+      message: 'Order confirmed and ready for pickup',
+      data: {
+        order: {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          storeCode: order.storeCode,
+          orderStatus: 'ready_for_pickup',
+          confirmedAt: order.confirmedAt,
+          customerName: `${order.user.firstName} ${order.user.surname}`,
+          notes: notes
+        }
+      }
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Confirm pickup error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to confirm pickup',
+      error: error.message
+    });
+  }
+};
+
+// POS: Mark order as collected by dependent
+const markCollected = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  
+  try {
+    const { orderId } = req.params;
+    const { collectionMethod = 'in_store_pickup', notes, staffId } = req.body;
+
+    // Find order
+    const order = await Order.findOne({
+      where: { id: orderId },
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['firstName', 'surname', 'email']
+      }, {
+        model: OrderItem,
+        as: 'orderItems',
+        attributes: ['quantity', 'priceAtTime', 'totalPrice', 'productSnapshot']
+      }],
+      transaction
+    });
+
+    if (!order) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Only ready_for_pickup orders can be marked as collected
+    if (order.orderStatus !== 'ready_for_pickup' && order.orderStatus !== 'processing') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Order status is ${order.orderStatus}, cannot collect. Expected: ready_for_pickup or processing`
+      });
+    }
+
+    // Update order status
+    await order.update({
+      orderStatus: 'delivered',
+      collectedAt: new Date(),
+      fulfillmentMethod: collectionMethod,
+      fulfillmentNotes: notes || `Collected by staff: ${staffId}`
+    }, { transaction });
+
+    await transaction.commit();
+
+    res.json({
+      success: true,
+      message: 'Order marked as collected',
+      data: {
+        order: {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          storeCode: order.storeCode,
+          orderStatus: 'delivered',
+          collectedAt: order.collectedAt,
+          collectionMethod: collectionMethod,
+          customerName: `${order.user.firstName} ${order.user.surname}`,
+          totalAmount: order.totalAmount,
+          itemCount: order.orderItems?.length || 0,
+          notes: notes
+        }
+      }
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Mark collected error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark order as collected',
+      error: error.message
+    });
+  }
+};
+
+// List pending orders (for POS/retailer to see all orders waiting for pickup)
+const getPendingOrders = async (req, res) => {
+  try {
+    const orders = await Order.findAll({
+      where: {
+        orderStatus: ['processing', 'ready_for_pickup']
+      },
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['firstName', 'surname', 'Idnumber']
+      }, {
+        model: OrderItem,
+        as: 'orderItems',
+        attributes: ['quantity', 'priceAtTime', 'productSnapshot']
+      }],
+      order: [['createdAt', 'DESC']],
+      limit: 50
+    });
+
+    res.json({
+      success: true,
+      message: 'Pending orders retrieved',
+      data: orders.map(order => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        storeCode: order.storeCode,
+        customerName: `${order.user.firstName} ${order.user.surname}`,
+        customerAge: calculateAge(order.user.Idnumber),
+        totalAmount: order.totalAmount,
+        itemCount: order.orderItems?.length || 0,
+        orderStatus: order.orderStatus,
+        createdAt: order.createdAt,
+        confirmedAt: order.confirmedAt
+      }))
+    });
+
+  } catch (error) {
+    console.error('Get pending orders error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve pending orders',
+      error: error.message
+    });
+  }
+};
+
+// Helper: calculate age from Idnumber
+const calculateAge = (idnumber) => {
+  if (!idnumber || idnumber.length < 6) return null;
+  const year = parseInt(idnumber.substring(0, 2));
+  const month = parseInt(idnumber.substring(2, 4));
+  const day = parseInt(idnumber.substring(4, 6));
+  const fullYear = year <= new Date().getFullYear() % 100 ? 2000 + year : 1900 + year;
+  const birthDate = new Date(fullYear, month - 1, day);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+};
+
 module.exports = {
   checkout,
   getOrders,
   getOrderDetails,
   getOrderByStoreCode,
-  cancelOrder
+  cancelOrder,
+  confirmPickup,
+  markCollected,
+  getPendingOrders
 };

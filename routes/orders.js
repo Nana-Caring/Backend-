@@ -2,12 +2,16 @@ const express = require('express');
 const router = express.Router();
 const { body, param, query } = require('express-validator');
 const auth = require('../middlewares/auth');
+const { authorizeRole } = require('../middlewares/auth');
 const {
   checkout,
   getOrders,
   getOrderDetails,
   getOrderByStoreCode,
-  cancelOrder
+  cancelOrder,
+  confirmPickup,
+  markCollected,
+  getPendingOrders
 } = require('../controllers/orderController');
 
 // Validation middleware
@@ -123,5 +127,35 @@ router.get('/store/:storeCode', validateStoreCode, getOrderByStoreCode);
  * @access  Private (Dependents only)
  */
 router.post('/:id/cancel', validateOrderId, cancelOrder);
+
+/**
+ * @route   POST /api/orders/:id/confirm-pickup
+ * @desc    POS: Confirm order is packed and ready for collection
+ * @access  Private (Retailer/POS staff)
+ */
+router.post('/:id/confirm-pickup', auth, authorizeRole(['retailer', 'caregiver']), [
+  param('id').isInt().withMessage('Order ID must be an integer'),
+  body('staffId').optional().isString(),
+  body('notes').optional().isString().trim()
+], confirmPickup);
+
+/**
+ * @route   POST /api/orders/:id/mark-collected
+ * @desc    POS: Mark order as collected by dependent
+ * @access  Private (Retailer/POS staff)
+ */
+router.post('/:id/mark-collected', auth, authorizeRole(['retailer', 'caregiver']), [
+  param('id').isInt().withMessage('Order ID must be an integer'),
+  body('collectionMethod').optional().isString(),
+  body('staffId').optional().isString(),
+  body('notes').optional().isString().trim()
+], markCollected);
+
+/**
+ * @route   GET /api/orders/pos/pending
+ * @desc    POS: Get all pending orders awaiting pickup
+ * @access  Private (Retailer/POS staff)
+ */
+router.get('/pos/pending', auth, authorizeRole(['retailer', 'caregiver']), getPendingOrders);
 
 module.exports = router;
