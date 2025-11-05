@@ -22,14 +22,14 @@ exports.getUserDetails = async (req, res) => {
                     include: [
                         {
                             model: Account,
-                            as: 'accounts',
+                            as: 'Accounts',
                             attributes: ['id', 'accountNumber', 'accountType', 'balance', 'currency', 'status']
                         }
                     ]
                 },
                 {
                     model: Account,
-                    as: 'accounts',
+                    as: 'Accounts',
                     attributes: ['id', 'accountNumber', 'accountType', 'balance', 'currency', 'status']
                 }
             ]
@@ -38,7 +38,7 @@ exports.getUserDetails = async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
         // Optionally fetch recent activity (last 10 transactions)
-        const accountIds = user.accounts ? user.accounts.map(acc => acc.id) : [];
+        const accountIds = user.Accounts ? user.Accounts.map(acc => acc.id) : [];
         let recentTransactions = [];
         if (accountIds.length > 0) {
             recentTransactions = await Transaction.findAll({

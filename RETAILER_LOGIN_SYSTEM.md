@@ -104,8 +104,8 @@ After logging in, retailer staff can access these POS endpoints:
 Use the retailer login for POS terminal applications:
 
 ```javascript
-// Login
-const loginResponse = await fetch('/api/auth/retailer-login', {
+// Login (Production)
+const loginResponse = await fetch('https://nanacaring-backend.onrender.com/api/auth/retailer-login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -117,13 +117,335 @@ const loginResponse = await fetch('/api/auth/retailer-login', {
 
 const { accessToken, retailer } = await loginResponse.json();
 
-// Use token for POS operations
-const ordersResponse = await fetch('/api/orders/pos/pending', {
+// Use token for POS operations (Production)
+const ordersResponse = await fetch('https://nanacaring-backend.onrender.com/api/orders/pos/pending', {
   headers: { 
     'Authorization': `Bearer ${accessToken}`,
     'Content-Type': 'application/json'
   }
 });
+```
+
+## Production Deployment 🌐
+
+**Production Server**: `https://nanacaring-backend.onrender.com`
+
+### Production API Endpoints:
+- **Login**: `POST https://nanacaring-backend.onrender.com/api/auth/retailer-login`
+- **Pending Orders**: `GET https://nanacaring-backend.onrender.com/api/orders/pos/pending`
+- **Confirm Pickup**: `POST https://nanacaring-backend.onrender.com/api/orders/:id/confirm-pickup`
+- **Mark Collected**: `POST https://nanacaring-backend.onrender.com/api/orders/:id/mark-collected`
+
+## Successful Implementation ✅
+
+- **✅ Login Working**: Retailer can successfully login and navigate to dashboard
+- **✅ Authentication**: JWT tokens are properly generated and validated
+- **✅ API Access**: POS endpoints are accessible with retailer tokens
+- **✅ Test Results**: 2 pending orders retrieved successfully via API
+- **✅ Production Ready**: System deployed and accessible at nanacaring-backend.onrender.com
+
+## Troubleshooting
+
+### Frontend Not Showing Orders
+If you can login but can't see orders in the dashboard:
+
+1. **Check Frontend API Calls**: Ensure the frontend is calling the POS-specific endpoint:
+   ```javascript
+   // ❌ Wrong - Regular endpoint (won't work for retailers)
+   fetch('https://nanacaring-backend.onrender.com/api/orders')
+   
+   // ✅ Correct - POS endpoint for retailers
+   fetch('https://nanacaring-backend.onrender.com/api/orders/pos/pending', {
+     headers: { 'Authorization': `Bearer ${accessToken}` }
+   })
+   ```
+
+2. **Verify Token Usage**: Make sure the frontend is using the retailer token:
+   ```javascript
+   // Store the retailer token after login
+   localStorage.setItem('retailerToken', accessToken);
+   
+   // Use it in API calls
+   const token = localStorage.getItem('retailerToken');
+   fetch('https://nanacaring-backend.onrender.com/api/orders/pos/pending', {
+     headers: { 'Authorization': `Bearer ${token}` }
+   })
+   ```
+
+3. **Check Role-Based UI**: The frontend might need to show different views for retailers:
+   ```javascript
+   if (user.role === 'retailer') {
+     // Show POS dashboard with pending orders
+     loadPOSOrders();
+   } else {
+     // Show regular user dashboard
+     loadUserOrders();
+   }
+   ```
+
+### Common Issues
+- **Wrong Endpoint**: Using `/api/orders` instead of `/api/orders/pos/pending`
+- **Missing Authorization**: Not including Bearer token in headers
+- **Role Check**: Frontend filtering out orders for retailer role
+- **State Management**: Frontend not updating state after successful API call
+
+## Complete API Reference 📚
+
+### 1. Retailer Login
+**Endpoint**: `POST /api/auth/retailer-login`  
+**URL**: `https://nanacaring-backend.onrender.com/api/auth/retailer-login`
+
+**Request Headers**:
+```
+Content-Type: application/json
+```
+
+**Request Body**:
+```json
+{
+  "email": "retailer_admin@clicksstore.com",
+  "password": "retailer_admin2025",
+  "storeId": "main_store"
+}
+```
+
+**Success Response (200)**:
+```json
+{
+  "success": true,
+  "message": "Retailer login successful",
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "retailer": {
+    "id": 28,
+    "firstName": "Clicks",
+    "middleName": null,
+    "surname": "Retailer Store",
+    "email": "retailer_admin@clicksstore.com",
+    "role": "retailer",
+    "storeId": "main_store",
+    "loginTime": "2025-11-04T18:10:17.628Z"
+  },
+  "permissions": [
+    "view_pending_orders",
+    "confirm_pickup",
+    "mark_collected",
+    "view_order_details"
+  ]
+}
+```
+
+**Error Response (401)**:
+```json
+{
+  "success": false,
+  "error": "Invalid retailer credentials or account not found"
+}
+```
+
+---
+
+### 2. View Pending Orders
+**Endpoint**: `GET /api/orders/pos/pending`  
+**URL**: `https://nanacaring-backend.onrender.com/api/orders/pos/pending`
+
+**Request Headers**:
+```
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+**Success Response (200)**:
+```json
+{
+  "success": true,
+  "message": "Pending orders retrieved",
+  "data": [
+    {
+      "id": 8,
+      "orderNumber": "ORD1762261407711629",
+      "storeCode": "LKECMX5Y",
+      "customerName": "Mandla Khumalo",
+      "customerAge": 20,
+      "totalAmount": "79.99",
+      "itemCount": 1,
+      "orderStatus": "processing",
+      "createdAt": "2025-11-04T13:03:27.738Z",
+      "confirmedAt": null
+    },
+    {
+      "id": 7,
+      "orderNumber": "ORD1762240466684451",
+      "storeCode": "DM9QL5MF",
+      "customerName": "Emma Johnson",
+      "customerAge": 1,
+      "totalAmount": "254.96",
+      "itemCount": 3,
+      "orderStatus": "processing",
+      "createdAt": "2025-11-04T07:14:26.713Z",
+      "confirmedAt": null
+    }
+  ]
+}
+```
+
+**Error Response (403)**:
+```json
+{
+  "success": false,
+  "message": "Access denied. Required roles: retailer, caregiver. Your role: dependent"
+}
+```
+
+---
+
+### 3. Confirm Order Ready for Pickup
+**Endpoint**: `POST /api/orders/:id/confirm-pickup`  
+**URL**: `https://nanacaring-backend.onrender.com/api/orders/8/confirm-pickup`
+
+**Request Headers**:
+```
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+**Request Body**:
+```json
+{
+  "staffId": "staff_123",
+  "notes": "Order packed and ready for collection"
+}
+```
+
+**Success Response (200)**:
+```json
+{
+  "success": true,
+  "message": "Order confirmed and ready for pickup",
+  "data": {
+    "order": {
+      "id": 8,
+      "orderNumber": "ORD1762261407711629",
+      "storeCode": "LKECMX5Y",
+      "orderStatus": "ready_for_pickup",
+      "confirmedAt": "2025-11-04T18:30:00.000Z",
+      "customerName": "Mandla Khumalo",
+      "notes": "Order packed and ready for collection"
+    }
+  }
+}
+```
+
+**Error Response (400)**:
+```json
+{
+  "success": false,
+  "message": "Order status is delivered, cannot confirm. Expected: processing"
+}
+```
+
+**Error Response (404)**:
+```json
+{
+  "success": false,
+  "message": "Order not found"
+}
+```
+
+---
+
+### 4. Mark Order as Collected
+**Endpoint**: `POST /api/orders/:id/mark-collected`  
+**URL**: `https://nanacaring-backend.onrender.com/api/orders/8/mark-collected`
+
+**Request Headers**:
+```
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+**Request Body**:
+```json
+{
+  "collectionMethod": "in_store_pickup",
+  "staffId": "staff_123",
+  "notes": "Collected by customer with ID verification"
+}
+```
+
+**Success Response (200)**:
+```json
+{
+  "success": true,
+  "message": "Order marked as collected",
+  "data": {
+    "order": {
+      "id": 8,
+      "orderNumber": "ORD1762261407711629",
+      "storeCode": "LKECMX5Y",
+      "orderStatus": "delivered",
+      "collectedAt": "2025-11-04T18:45:00.000Z",
+      "collectionMethod": "in_store_pickup",
+      "customerName": "Mandla Khumalo",
+      "totalAmount": "79.99",
+      "itemCount": 1,
+      "notes": "Collected by customer with ID verification"
+    }
+  }
+}
+```
+
+**Error Response (400)**:
+```json
+{
+  "success": false,
+  "message": "Order status is delivered, cannot collect. Expected: ready_for_pickup or processing"
+}
+```
+
+---
+
+### 5. Get Order Details by Store Code
+**Endpoint**: `GET /api/orders/store-code/:storeCode`  
+**URL**: `https://nanacaring-backend.onrender.com/api/orders/store-code/LKECMX5Y`
+
+**Request Headers**:
+```
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+**Success Response (200)**:
+```json
+{
+  "success": true,
+  "order": {
+    "id": 8,
+    "orderNumber": "ORD1762261407711629",
+    "storeCode": "LKECMX5Y",
+    "orderStatus": "processing",
+    "totalAmount": "79.99",
+    "paymentStatus": "completed",
+    "createdAt": "2025-11-04T13:03:27.738Z",
+    "customer": {
+      "firstName": "Mandla",
+      "surname": "Khumalo",
+      "age": 20
+    },
+    "orderItems": [
+      {
+        "quantity": 1,
+        "priceAtTime": "79.99",
+        "totalPrice": "79.99",
+        "productSnapshot": {
+          "name": "Baby Formula - Stage 1",
+          "brand": "Nan",
+          "category": "Infant Nutrition"
+        }
+      }
+    ]
+  }
+}
 ```
 
 ## Migration Notes
