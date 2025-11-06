@@ -28,7 +28,7 @@ Authorization: Bearer <caregiver_jwt_token>
 
 {
   "firstName": "Emma",
-  "lastName": "Johnson",
+  "middleName": "Grace",
   "surname": "Johnson",
   "email": "emma.johnson@example.com",
   "password": "SecurePass123!",
@@ -55,7 +55,7 @@ Authorization: Bearer <caregiver_jwt_token>
   "user": {
     "id": 15,
     "firstName": "Emma",
-    "lastName": "Johnson",
+    "middleName": "Grace",
     "surname": "Johnson",
     "email": "emma.johnson@example.com",
     "role": "dependent",
@@ -104,7 +104,8 @@ Content-Type: application/json
   "user": {
     "id": 15,
     "firstName": "Emma",
-    "lastName": "Johnson",
+    "middleName": "Grace",
+    "surname": "Johnson",
     "email": "emma.johnson@example.com",
     "role": "dependent",
     "status": "active"

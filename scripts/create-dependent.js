@@ -5,22 +5,12 @@ const API_BASE = 'https://nanacaring-backend.onrender.com/api';
 
 const dependentData = {
   firstName: 'Emma',
-  lastName: 'Johnson', // Required by validation
+  middleName: 'Grace',
   surname: 'Johnson',
   email: 'dependent@demo.com',
   password: 'Demo123!@#',
-  phoneNumber: '+27823456789',
   Idnumber: '9012155800089',
-  relation: 'child', // Required by validation
-  dateOfBirth: '1990-12-15',
-  homeAddressLine1: '456 Oak Avenue',
-  homeCity: 'Johannesburg',
-  homeProvince: 'Gauteng',
-  homeCode: '2001',
-  postalAddressLine1: 'PO Box 456',
-  postalCity: 'Johannesburg',
-  postalProvince: 'Gauteng',
-  postalCode: '2001'
+  relation: 'daughter'
 };
 
 async function createDependent() {

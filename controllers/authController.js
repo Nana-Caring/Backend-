@@ -136,84 +136,34 @@ exports.register = async (req, res) => {
   }
 };
 
-// Register dependent (called by caregiver)
+// Register dependent (called by caregiver or funder)
 exports.registerDependent = async (req, res) => {
   try {
-    const { firstName, middleName, surname, email, password, Idnumber, relation, isInfant, dateOfBirth } = req.body;
-    const caregiverId = req.user.id;
-
-    // Determine flow: infant (0-1 years) or regular dependent
-    const infantFlow = Boolean(isInfant) || Boolean(dateOfBirth);
+    const { firstName, middleName, surname, email, password, Idnumber, relation } = req.body;
+    const userId = req.user.id;
 
     // Validate required fields (middleName is optional)
-    if (!firstName || !surname) {
-      return res.status(400).json({ message: 'First name and surname are required' });
-    }
-    if (!infantFlow) {
-      if (!email || !password || !Idnumber || !relation) {
-        return res.status(400).json({ message: 'Required fields are missing' });
-      }
-    } else {
-      // For infant flow, dateOfBirth is required
-      if (!dateOfBirth) {
-        return res.status(400).json({ message: 'dateOfBirth is required for infant registration' });
-      }
+    if (!firstName || !surname || !email || !password || !Idnumber || !relation) {
+      return res.status(400).json({ message: 'Required fields are missing' });
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    let finalEmail = email;
-    if (!infantFlow) {
-      if (!emailRegex.test(finalEmail)) {
-        return res.status(400).json({ message: 'Valid email address required' });
-      }
-    } else {
-      // Generate placeholder email for infant if not provided
-      if (!finalEmail) {
-        const suffix = Math.random().toString(36).slice(2, 8);
-        finalEmail = `${firstName.toLowerCase()}.${surname.toLowerCase()}.${suffix}@infant.system`;
-      }
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Valid email address required' });
     }
 
-    // Validate email uniqueness
-    const emailExists = await User.findOne({ where: { email: finalEmail } });
-    if (emailExists){
-      return res.status(400).json({message:'Email already exists'});
-    }
-
-    // Validate or generate ID number
+    // Validate ID number format
     const IdnumberRegex = /^[0-9]{13}$/;
-    let finalId = Idnumber;
-    if (!infantFlow) {
-      if (!IdnumberRegex.test(finalId)) {
-        return res.status(400).json({ message: 'Valid 13-digit numeric ID number required' });
-      }
-    } else {
-      // generate temporary ID if not provided
-      if (!finalId) {
-        const birthDate = new Date(dateOfBirth);
-        const yearStr = birthDate.getFullYear().toString();
-        const monthStr = (birthDate.getMonth() + 1).toString().padStart(2, '0');
-        const dayStr = birthDate.getDate().toString().padStart(2, '0');
-        const randomStr = Math.random().toString().slice(-5);
-        finalId = `${yearStr}${monthStr}${dayStr}${randomStr}`;
-      }
-    }
-    
-    // Validate ID number uniqueness
-    const idNumberExists = await User.findOne({ where: { Idnumber: finalId } });
-    if (idNumberExists) {
-      return res.status(400).json({ message: 'ID number already exists' });
+    if (!IdnumberRegex.test(Idnumber)) {
+      return res.status(400).json({ message: 'Valid 13-digit numeric ID number required' });
     }
 
-
-
-    // Verify caregiver status
-    const caregiver = await User.findByPk(caregiverId);
-    if (!caregiver || caregiver.role !== 'caregiver') {
-      return res.status(403).json({ message: 'Only caregivers can register dependents' });
+    // Verify user authorization (must be caregiver or funder)
+    const registeredBy = await User.findByPk(userId);
+    if (!registeredBy || (registeredBy.role !== 'caregiver' && registeredBy.role !== 'funder')) {
+      return res.status(403).json({ message: 'Only caregivers and funders can register dependents' });
     }
-    
     
     // Check if email or ID number already exists
     const existingUser = await User.findOne({
@@ -227,22 +177,22 @@ exports.registerDependent = async (req, res) => {
 
     // Hash password
     const saltRounds = 10;
-  const hashedPassword = await bcrypt.hash(infantFlow ? (password || 'temporary-password') : password, saltRounds);
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // Create dependent with explicit null values for optional fields
     const dependentPayload = {
       firstName,
       middleName: middleName || null,  // Optional field
       surname,
-      email: finalEmail,
+      email,
       password: hashedPassword,
-      Idnumber: finalId,
-      relation: relation || (infantFlow ? 'child' : null),
+      Idnumber,
+      relation,
       role: 'dependent',
-      // Pregnancy/infant fields
-      isInfant: infantFlow ? true : false,
+      // Set infant/pregnancy fields to default values
+      isInfant: false,
       isUnborn: false,
-      dateOfBirth: infantFlow ? new Date(dateOfBirth) : null,
+      dateOfBirth: null,
       parentCaregiverId: caregiverId,
       // Explicitly set personal details to null until user edits them
       phoneNumber: null,
@@ -290,7 +240,7 @@ exports.registerDependent = async (req, res) => {
         const subAccountNumber = await generateUniqueAccountNumber();
         return Account.create({
           userId: dependent.id,
-          caregiverId: req.user.id, // Link to the caregiver who is registering this dependent
+          caregiverId: req.user.id, // Link to the user (caregiver or funder) who is registering this dependent
           accountType: type,
           balance: 0,
           parentAccountId: mainAccount.id,
@@ -312,25 +262,23 @@ exports.registerDependent = async (req, res) => {
       accounts: [mainAccount, ...subAccounts].map(acc => acc.get ? acc.get({ plain: true }) : acc)
     };
 
-    // Send welcome email with login credentials (skip for system/infant emails)
-    if (!infantFlow && dependent.email && !dependent.email.endsWith('@infant.system')) {
-      try {
-        const emailHtml = getWelcomeEmail({ 
-          user: dependent, 
-          password: password // Send the original password before hashing
-        });
-        
-        await sendMail({
-          to: dependent.email,
-          subject: 'Welcome to NANA Portal - Your Login Credentials',
-          html: emailHtml
-        });
-        
-        console.log(`Welcome email sent successfully to dependent ${dependent.email}`);
-      } catch (emailError) {
-        console.error('Failed to send welcome email to dependent:', emailError);
-        // Don't fail the registration if email fails
-      }
+    // Send welcome email with login credentials
+    try {
+      const emailHtml = getWelcomeEmail({ 
+        user: dependent, 
+        password: password // Send the original password before hashing
+      });
+      
+      await sendMail({
+        to: dependent.email,
+        subject: 'Welcome to NANA Portal - Your Login Credentials',
+        html: emailHtml
+      });
+      
+      console.log(`Welcome email sent successfully to dependent ${dependent.email}`);
+    } catch (emailError) {
+      console.error('Failed to send welcome email to dependent:', emailError);
+      // Don't fail the registration if email fails
     }
 
     res.status(201).json({

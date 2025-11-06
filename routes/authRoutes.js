@@ -36,9 +36,9 @@ router.post(
 router.post(
   "/register",
   [
-    check("firstName", "First name is required").not().isEmpty(),
-    check("lastName", "Last name is required").not().isEmpty(),
-    check("surname", "Surname is required").not().isEmpty(),
+    check("firstName", "First name is required").not().isEmpty().trim(),
+    check("middleName", "Middle name is optional").optional().trim(),
+    check("surname", "Surname is required").not().isEmpty().trim(),
     check("email", "Include a valid email").isEmail(),
     check("password", "Password must be at least 6 characters").isLength({ min: 6 }),
     check("role", "Role must be either funder or caregiver").isIn(["funder", "caregiver"]),
@@ -47,16 +47,18 @@ router.post(
   register
 );
 
-// REGISTER DEPENDENT (by Caregiver)
+// REGISTER DEPENDENT (by Caregiver or Funder)
 router.post(
   "/register-dependent",
   [
     authMiddleware,
-    check("firstName", "First name is required").not().isEmpty(),
-    check("lastName", "Last name is required").not().isEmpty(),
-    check("surname", "Surname is required").not().isEmpty(),
+    check("firstName", "First name is required").not().isEmpty().trim(),
+    check("middleName", "Middle name is optional").optional().trim(),
+    check("surname", "Surname is required").not().isEmpty().trim(),
+    check("email", "Valid email is required").isEmail(),
+    check("password", "Password must be at least 6 characters").isLength({ min: 6 }),
     check("Idnumber", "Valid 13-digit numeric ID number required").isLength({ min: 13, max: 13 }).isNumeric(),
-    check("relation", "Relation is required").not().isEmpty(),
+    check("relation", "Relation is required").not().isEmpty().trim(),
   ],
   registerDependent
 );
