@@ -1,0 +1,353 @@
+{
+  "info": {
+    "name": "Pregnancy & Infant Management API",
+    "description": "Complete test collection for pregnancy tracking and infant registration system",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login as Caregiver",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"caregiver@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('authToken', response.token);",
+                  "    pm.environment.set('userId', response.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pregnancy Management",
+      "item": [
+        {
+          "name": "Register New Pregnancy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motherName\": \"Sarah Williams\",\n  \"email\": \"sarah.williams@example.com\",\n  \"phone\": \"+27123456789\",\n  \"dueDate\": \"2025-06-15\",\n  \"lastMenstrualPeriod\": \"2024-09-08\",\n  \"doctorName\": \"Dr. Emily Smith\",\n  \"medicalAidNumber\": \"MED123456\",\n  \"emergencyContact\": {\n    \"name\": \"John Williams\",\n    \"phone\": \"+27987654321\",\n    \"relationship\": \"Husband\"\n  },\n  \"medicalHistory\": {\n    \"allergies\": [\"Penicillin\"],\n    \"chronicConditions\": [],\n    \"previousPregnancies\": 1\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/pregnancy/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["pregnancy", "register"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Pregnancy registered successfully', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('pregnantUserId', response.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Unborn Baby",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parentId\": \"{{pregnantUserId}}\",\n  \"nickname\": \"Baby Williams\",\n  \"gender\": \"unknown\",\n  \"dueDate\": \"2025-06-15\",\n  \"gestationalAge\": 32,\n  \"medicalNotes\": \"Healthy development, regular checkups\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/pregnancy/unborn",
+              "host": ["{{baseUrl}}"],
+              "path": ["pregnancy", "unborn"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Unborn baby registered successfully', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('unbornBabyId', response.dependent.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Infant Management",
+      "item": [
+        {
+          "name": "Register Newborn Infant (0 years)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parentId\": \"{{pregnantUserId}}\",\n  \"firstName\": \"Emma\",\n  \"lastName\": \"Williams\",\n  \"dateOfBirth\": \"2025-11-01\",\n  \"gender\": \"female\",\n  \"birthWeight\": 3.2,\n  \"birthLength\": 50,\n  \"hospitalOfBirth\": \"Cape Town Maternity Hospital\",\n  \"birthCertificateNumber\": \"BC2025110001\",\n  \"medicalNotes\": \"Healthy birth, full term\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/pregnancy/infant",
+              "host": ["{{baseUrl}}"],
+              "path": ["pregnancy", "infant"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Infant registered successfully', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('infantId', response.dependent.id);",
+                  "    pm.test('Age is 0 years', function () {",
+                  "        pm.expect(response.dependent.age).to.equal(0);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Birth Information",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unbornId\": \"{{unbornBabyId}}\",\n  \"firstName\": \"Emma\",\n  \"lastName\": \"Williams\",\n  \"dateOfBirth\": \"2025-11-01\",\n  \"gender\": \"female\",\n  \"birthWeight\": 3.2,\n  \"birthLength\": 50,\n  \"hospitalOfBirth\": \"Cape Town Maternity Hospital\",\n  \"birthCertificateNumber\": \"BC2025110001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/pregnancy/birth",
+              "host": ["{{baseUrl}}"],
+              "path": ["pregnancy", "birth"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Birth information updated successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.test('Unborn converted to infant', function () {",
+                  "        pm.expect(response.dependent.age).to.equal(0);",
+                  "        pm.expect(response.dependent.firstName).to.equal('Emma');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Family Information",
+      "item": [
+        {
+          "name": "Get Family Information",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pregnancy/family",
+              "host": ["{{baseUrl}}"],
+              "path": ["pregnancy", "family"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Family information retrieved successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.test('Contains pregnancy information', function () {",
+                  "        pm.expect(response.pregnancies).to.be.an('array');",
+                  "    });",
+                  "    pm.test('Contains dependents information', function () {",
+                  "        pm.expect(response.dependents).to.be.an('array');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Product Integration",
+      "item": [
+        {
+          "name": "Get Pregnancy Products",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products?category=Pregnancy&shop=clicks",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "Pregnancy"
+                },
+                {
+                  "key": "shop",
+                  "value": "clicks"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Pregnancy products retrieved successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.test('Contains pregnancy category products', function () {",
+                  "        pm.expect(response.products).to.be.an('array');",
+                  "        if (response.products.length > 0) {",
+                  "            pm.expect(response.products[0].category).to.equal('Pregnancy');",
+                  "        }",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Set base URL if not already set",
+          "if (!pm.environment.get('baseUrl')) {",
+          "    pm.environment.set('baseUrl', 'http://localhost:5000');",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    }
+  ]
+}

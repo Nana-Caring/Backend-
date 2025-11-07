@@ -121,8 +121,8 @@ const getUserTransactions = async (req, res) => {
               include: [
                 {
                   model: OrderItem,
-                  as: 'orderItems',
-                  attributes: ['quantity', 'priceAtOrder'],
+                  as: 'items',
+                  attributes: ['quantity', 'priceAtTime'],
                   include: [
                     {
                       model: Product,
@@ -139,12 +139,12 @@ const getUserTransactions = async (req, res) => {
                 orderNumber: order.orderNumber,
                 storeCode: order.storeCode,
                 status: order.orderStatus,
-                itemCount: order.orderItems?.length || 0,
-                items: order.orderItems?.map(item => ({
+                itemCount: order.items?.length || 0,
+                items: order.items?.map(item => ({
                   name: item.product?.name,
                   brand: item.product?.brand,
                   quantity: item.quantity,
-                  price: item.priceAtOrder,
+                  price: item.priceAtTime,
                   image: item.product?.image
                 })) || []
               };
@@ -367,7 +367,7 @@ const getTransactionDetails = async (req, res) => {
           include: [
             {
               model: OrderItem,
-              as: 'orderItems',
+              as: 'items',
               include: [
                 {
                   model: Product,
@@ -386,7 +386,7 @@ const getTransactionDetails = async (req, res) => {
             status: order.orderStatus,
             paymentStatus: order.paymentStatus,
             createdAt: order.createdAt,
-            items: order.orderItems.map(item => {
+            items: order.items.map(item => {
               let productSnapshot = {};
               try {
                 productSnapshot = JSON.parse(item.productSnapshot || '{}');
@@ -401,8 +401,8 @@ const getTransactionDetails = async (req, res) => {
                 image: productSnapshot.image || item.product?.image,
                 sku: productSnapshot.sku || item.product?.sku,
                 quantity: item.quantity,
-                priceAtOrder: item.priceAtOrder,
-                subtotal: item.subtotal
+                priceAtTime: item.priceAtTime,
+                totalPrice: item.totalPrice
               };
             })
           };

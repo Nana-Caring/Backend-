@@ -1,7 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const { User, Account } = require("../models");
+const { User, Account, FunderDependent } = require("../models");
 const { Sequelize, Op } = require('sequelize');
 // Email service removed - frontend handles UI
 // const generateUniqueAccountNumber = require('../utils/generateUniqueAccountNumber');
@@ -11,7 +11,7 @@ const { sendMail, getWelcomeEmail } = require('../utils/emailService');
 // Register new user (funder or caregiver)
 exports.register = async (req, res) => {
   try {
-    const { firstName, middleName, surname, email, password, role, Idnumber } = req.body;
+    const { firstName, middleName, surname, email, password, role, Idnumber, isPregnant, expectedDueDate } = req.body;
 
     // Validate role
     if (!["funder", "caregiver"].includes(role)) {
@@ -40,8 +40,8 @@ exports.register = async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user with explicit null values for optional fields
-    const user = await User.create({ 
+    // Prepare base user payload with explicit null values for optional fields
+    const basePayload = { 
       firstName, 
       middleName: middleName || null, 
       surname, 
@@ -61,7 +61,29 @@ exports.register = async (req, res) => {
       homeCity: null,
       homeProvince: null,
       homeCode: null
-    });
+    };
+
+    // If caregiver, accept optional pregnancy fields
+    if (role === 'caregiver') {
+      if (typeof isPregnant === 'boolean') {
+        basePayload.isPregnant = isPregnant;
+      }
+      if (expectedDueDate) {
+        const due = new Date(expectedDueDate);
+        if (isNaN(due.getTime())) {
+          return res.status(400).json({ message: 'Invalid expectedDueDate' });
+        }
+        const today = new Date();
+        if (due <= today) {
+          return res.status(400).json({ message: 'expectedDueDate must be in the future' });
+        }
+        basePayload.expectedDueDate = due;
+        basePayload.isPregnant = true;
+      }
+    }
+
+    // Create new user
+    const user = await User.create(basePayload);
 
     // If the user is a funder, create an account for them
     let account = null;
@@ -114,14 +136,14 @@ exports.register = async (req, res) => {
   }
 };
 
-// Register dependent (called by caregiver)
+// Register dependent (called by caregiver or funder)
 exports.registerDependent = async (req, res) => {
   try {
-    const { firstName, middleName, surname, email, password, Idnumber, relation } = req.body;
-    const caregiverId = req.user.id;
+    const { firstName, middleName, surname, email, password, Idnumber, relation, customName, notes } = req.body;
+    const userId = req.user.id;
 
-    // Validate required fields (middleName is now optional)
-    if (!firstName || !email || !password || !Idnumber || !relation) {
+    // Validate required fields (middleName is optional)
+    if (!firstName || !surname || !email || !password || !Idnumber || !relation) {
       return res.status(400).json({ message: 'Required fields are missing' });
     }
 
@@ -131,32 +153,17 @@ exports.registerDependent = async (req, res) => {
       return res.status(400).json({ message: 'Valid email address required' });
     }
 
-    // Validate email uniqueness
-    const emailExists = await User.findOne({ where: { email } });
-    if (emailExists){
-      return res.status(400).json({message:'Email already exists'});
-    }
-
     // Validate ID number format
     const IdnumberRegex = /^[0-9]{13}$/;
     if (!IdnumberRegex.test(Idnumber)) {
       return res.status(400).json({ message: 'Valid 13-digit numeric ID number required' });
     }
-    
-    // Validate ID number uniqueness
-    const idNumberExists = await User.findOne({ where: { Idnumber } });
-    if (idNumberExists) {
-      return res.status(400).json({ message: 'ID number already exists' });
+
+    // Verify user authorization (must be caregiver or funder)
+    const registeredBy = await User.findByPk(userId);
+    if (!registeredBy || (registeredBy.role !== 'caregiver' && registeredBy.role !== 'funder')) {
+      return res.status(403).json({ message: 'Only caregivers and funders can register dependents' });
     }
-
-
-
-    // Verify caregiver status
-    const caregiver = await User.findByPk(caregiverId);
-    if (!caregiver || caregiver.role !== 'caregiver') {
-      return res.status(403).json({ message: 'Only caregivers can register dependents' });
-    }
-    
     
     // Check if email or ID number already exists
     const existingUser = await User.findOne({
@@ -173,7 +180,7 @@ exports.registerDependent = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // Create dependent with explicit null values for optional fields
-    const dependent = await User.create({
+    const dependentPayload = {
       firstName,
       middleName: middleName || null,  // Optional field
       surname,
@@ -182,6 +189,12 @@ exports.registerDependent = async (req, res) => {
       Idnumber,
       relation,
       role: 'dependent',
+      customName: customName || `${firstName} ${surname}`, // Use customName or fallback to real name
+      // Set infant/pregnancy fields to default values
+      isInfant: false,
+      isUnborn: false,
+      dateOfBirth: null,
+      parentCaregiverId: userId, // Fixed: should be userId, not caregiverId
       // Explicitly set personal details to null until user edits them
       phoneNumber: null,
       postalAddressLine1: null,
@@ -194,12 +207,14 @@ exports.registerDependent = async (req, res) => {
       homeCity: null,
       homeProvince: null,
       homeCode: null
-    });
+    };
+
+    const dependent = await User.create(dependentPayload);
 
     // Generate unique account number for main account
     const mainAccountNumber = await generateUniqueAccountNumber();
 
-    // Create main account for dependent
+    // Create main account for dependent (serves as Emergency Fund)
     const mainAccount = await Account.create({
       userId: dependent.id,
       caregiverId: req.user.id, // Link to the caregiver who is registering this dependent
@@ -208,17 +223,25 @@ exports.registerDependent = async (req, res) => {
       parentAccountId: null,
       accountNumber: mainAccountNumber,
     });
-// main account, baby care account, entertainment account, clothing account,
-//  savings account, pregnancy account (no restrictions)
 
-    // Create sub-accounts for dependent
-    const subAccountTypes = ['Education', 'Healthcare', 'Clothing', 'Entertainment','Baby Care','Pregnancy' ,'Savings' ];
+    // Create 7 essential sub-accounts for dependent (Basic Needs Coverage)
+    // These accounts ensure all fundamental needs are met for the dependent
+    const subAccountTypes = [
+      'Healthcare',     // Medical services, medications, and health-related products
+      'Groceries',      // Food security - nutritious food and essentials
+      'Education',      // School fees, books, uniforms, and educational materials  
+      'Clothing',       // Clothing purchases and housing-related costs
+      'Baby Care',      // Strollers, milk, baby clothes, body care products
+      'Entertainment',  // Toys, movies, outings for children's development
+      'Pregnancy'       // Needs of mother and baby during pregnancy
+    ];
+    
     const subAccounts = await Promise.all(
       subAccountTypes.map(async (type) => {
         const subAccountNumber = await generateUniqueAccountNumber();
         return Account.create({
           userId: dependent.id,
-          caregiverId: req.user.id, // Link to the caregiver who is registering this dependent
+          caregiverId: req.user.id, // Link to the user (caregiver or funder) who is registering this dependent
           accountType: type,
           balance: 0,
           parentAccountId: mainAccount.id,
@@ -227,18 +250,61 @@ exports.registerDependent = async (req, res) => {
       })
     );
 
-    // Mirror savings balance to main account
-    const savingsAccount = subAccounts.find(acc => acc.accountType === 'Savings');
-    if (savingsAccount) {
-      mainAccount.balance = savingsAccount.balance;
-      await mainAccount.save();
+    // Log account creation for debugging
+    console.log(`✅ Created ${subAccounts.length + 1} accounts for dependent ${dependent.email}:`);
+    console.log(`  - 1 Main account (Savings/Emergency Fund): ${mainAccount.accountType}`);
+    console.log(`  - ${subAccounts.length} Sub-accounts: ${subAccounts.map(acc => acc.accountType).join(', ')}`);
+    console.log(`  - Total: ${subAccounts.length + 1}/8 accounts created (Basic Needs Coverage)`);
+
+    // Automatically create FunderDependent relationship if registered by funder
+    let funderDependentLink = null;
+    if (registeredBy.role === 'funder') {
+      try {
+        // Check if relationship already exists
+        const existingLink = await FunderDependent.findOne({
+          where: {
+            funderId: registeredBy.id,
+            dependentId: dependent.id
+          }
+        });
+
+        if (!existingLink) {
+          // Create the formal funder-dependent relationship
+          funderDependentLink = await FunderDependent.create({
+            funderId: registeredBy.id,
+            dependentId: dependent.id
+          });
+
+          console.log(`🔗 Automatic funder-dependent relationship created:`);
+          console.log(`   Funder: ${registeredBy.firstName} ${registeredBy.surname} (ID: ${registeredBy.id})`);
+          console.log(`   Dependent: ${dependent.firstName} ${dependent.surname} (ID: ${dependent.id})`);
+          console.log(`   Main Account: ${mainAccount.accountNumber}`);
+          console.log(`   Link ID: ${funderDependentLink.id}`);
+        } else {
+          console.log(`🔗 Funder-dependent relationship already exists (Link ID: ${existingLink.id})`);
+          funderDependentLink = existingLink;
+        }
+      } catch (linkError) {
+        console.error('❌ Failed to create funder-dependent relationship:', linkError);
+        // Don't fail the registration if linking fails - the caregiver relationship in accounts is sufficient
+      }
     }
 
     // Prepare response data
     const dependentResponse = {
       ...dependent.get({ plain: true }),
       password: undefined,
-      accounts: [mainAccount, ...subAccounts].map(acc => acc.get ? acc.get({ plain: true }) : acc)
+      displayName: dependent.customName, // Highlight the custom name for display
+      accounts: [mainAccount, ...subAccounts].map(acc => acc.get ? acc.get({ plain: true }) : acc),
+      // Include linking information if funder registered the dependent
+      ...(registeredBy.role === 'funder' && funderDependentLink && {
+        funderLink: {
+          linkId: funderDependentLink.id,
+          funderName: `${registeredBy.firstName} ${registeredBy.surname}`,
+          mainAccountNumber: mainAccount.accountNumber,
+          linkedAt: funderDependentLink.createdAt || new Date()
+        }
+      })
     };
 
     // Send welcome email with login credentials
@@ -317,8 +383,10 @@ exports.getDependents = async (req, res) => {
     const dependentsMap = new Map();
     dependentAccounts.forEach(account => {
       if (account.user && !dependentsMap.has(account.user.id)) {
+        const userData = account.user.toJSON();
         dependentsMap.set(account.user.id, {
-          ...account.user.toJSON(),
+          ...userData,
+          displayName: userData.customName || `${userData.firstName} ${userData.surname}`, // Show custom name
           accounts: []
         });
       }
@@ -473,6 +541,105 @@ exports.login = async (req, res) => {
 }
 };
 
+// Retailer login - specialized for POS store staff
+exports.retailerLogin = async (req, res) => {
+  try {
+    const { email, password, storeId } = req.body;
+
+    // Find retailer user by email
+    const retailer = await User.findOne({ 
+      where: { 
+        email,
+        role: 'retailer'
+      },
+      attributes: [
+        'id', 'firstName', 'middleName', 'surname', 'email', 
+        'password', 'role', 'Idnumber', 'createdAt', 'updatedAt'
+      ]
+    });
+
+    if (!retailer) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Invalid retailer credentials or account not found' 
+      });
+    }
+
+    // Check password
+    const isValidPassword = await bcrypt.compare(password, retailer.password);
+    if (!isValidPassword) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Invalid retailer credentials' 
+      });
+    }
+
+    // Generate JWT token with retailer-specific payload
+    const accessToken = jwt.sign(
+      { 
+        id: retailer.id, 
+        role: retailer.role,
+        storeId: storeId || 'main_store',
+        retailerAccess: true
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '12h' } // Longer session for store staff
+    );
+
+    const refreshToken = jwt.sign(
+      { 
+        id: retailer.id,
+        role: retailer.role
+      },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Set refresh token in httpOnly, secure cookie
+    res.cookie('retailerRefreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    // Retailer-specific response
+    const response = {
+      success: true,
+      message: 'Retailer login successful',
+      accessToken,
+      jwt: accessToken,
+      retailer: {
+        id: retailer.id,
+        firstName: retailer.firstName,
+        middleName: retailer.middleName,
+        surname: retailer.surname,
+        email: retailer.email,
+        role: retailer.role,
+        storeId: storeId || 'main_store',
+        loginTime: new Date().toISOString()
+      },
+      permissions: [
+        'view_pending_orders',
+        'confirm_pickup',
+        'mark_collected',
+        'view_order_details'
+      ]
+    };
+
+    console.log(`✅ Retailer login successful: ${retailer.email} at store ${storeId || 'main_store'}`);
+    res.json(response);
+
+  } catch (error) {
+    console.error('Retailer login error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Retailer login failed', 
+      details: error.message 
+    });
+  }
+};
+
 exports.refreshToken = (req, res) => {
   const token = req.cookies.refreshToken;
   if (!token) return res.status(401).json({ message: 'No refresh token' });
@@ -495,6 +662,7 @@ exports.adminLogin = async (req, res) => {
   try {
     const { email, password, firstName, surname, middleName } = req.body;
 
+    // Check admin credentials
     if (
       email === process.env.ADMIN_EMAIL &&
       password === process.env.ADMIN_PASSWORD
@@ -528,9 +696,45 @@ exports.adminLogin = async (req, res) => {
           role: 'admin'
         }
       });
-    } else {
-      return res.status(401).json({ message: 'Invalid admin credentials' });
     }
+    
+    // Check High Court credentials
+    if (
+      email === process.env.HIGHCOURT_EMAIL &&
+      password === process.env.HIGHCOURT_PASSWORD
+    ) {
+      // Generate JWT token for highcourt (same privileges as admin)
+      const accessToken = jwt.sign(
+        { id: -1, role: 'highcourt' },
+        process.env.JWT_SECRET
+      );
+      const refreshToken = jwt.sign(
+        { id: -1, role: 'highcourt' },
+        process.env.JWT_REFRESH_SECRET
+      );
+
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+      });
+
+      return res.json({
+        accessToken,
+        jwt: accessToken,
+        user: {
+          id: -1,
+          firstName: firstName || 'High Court',
+          middleName: middleName || '',
+          surname: surname || 'Admin',
+          email: process.env.HIGHCOURT_EMAIL,
+          role: 'highcourt'
+        }
+      });
+    }
+    
+    return res.status(401).json({ message: 'Invalid admin credentials' });
   } catch (error) {
     console.error('Admin login error:', error);
     res.status(500).json({ error: 'Admin login failed' });

@@ -1,0 +1,147 @@
+{
+  "scrapingDate": "2025-11-03T23:12:16.748Z",
+  "totalProducts": 32,
+  "successfullyScraped": 28,
+  "failedToScrape": 4,
+  "successRate": "87.5%",
+  "sourceBreakdown": {
+    "takealot": 0,
+    "amazon": 28
+  },
+  "failedProducts": [
+    {
+      "name": "Lucky Star Pilchards in Tomato Sauce 400g",
+      "brand": "Lucky Star",
+      "category": "Groceries"
+    },
+    {
+      "name": "Ritebrand Brown Bread 700g",
+      "brand": "Ritebrand",
+      "category": "Groceries"
+    },
+    {
+      "name": "White Star Super Maize Meal 2.5kg",
+      "brand": "White Star",
+      "category": "Groceries"
+    },
+    {
+      "name": "Woolworths Organic Baby Food Pouches 6-Pack",
+      "brand": "Woolworths",
+      "category": "Groceries"
+    }
+  ],
+  "scrapedProducts": [
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/61LpbPZg9-L._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71cnecF+76L._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71x6qEn52DL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/81OozC7q8FL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/81WqaNIdK6L._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71Nziyc+DEL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71EjJ1639CL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/710hvW2Q-DL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/81n3CRLgMqL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/G/01/HST/Search/HVAWidgetIPD3/HVA-Search-Widget_OM-Exam.png"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/31MAxjf0DqL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/G/01/HST/Search/HVAWidgetIPD3/HVA-Search-Widget_OM-Exam.png"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/81pFlntG2fL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/G/01/HST/Search/HVAWidgetIPD3/HVA-Search-Widget_OM-Exam.png"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71XtSKt9J0L._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/61RRaiLGWvL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71OX83jgN8L._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/81kjRLFg2UL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71S4A1R+w8L._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71V8yVZRLSL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71LPWW83ycL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/81Vr2u-LenL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/51A+x6Y0HBL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71p4shLwDiL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71RqDOsKnoL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/61synSO+qKL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/71NHneq0DiL._SL1500_.jpg"
+    },
+    {
+      "source": "amazon",
+      "imageUrl": "https://m.media-amazon.com/images/I/61vjufs4qvL._SL1500_.jpg"
+    }
+  ]
+}

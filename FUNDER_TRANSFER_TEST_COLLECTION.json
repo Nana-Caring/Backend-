@@ -1,0 +1,602 @@
+{
+  "info": {
+    "name": "Funder Transfer System - Complete Test Suite",
+    "description": "Comprehensive test collection for funder transfer functionality including authentication, validation, authorization, and transfer operations.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{funder_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://nanacaring-backend.onrender.com/api",
+      "type": "string"
+    },
+    {
+      "key": "funder_email",
+      "value": "funder@demo.com",
+      "type": "string"
+    },
+    {
+      "key": "funder_password",
+      "value": "Demo123!@#",
+      "type": "string"
+    },
+    {
+      "key": "funder_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "beneficiary_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "account_number",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Login as Funder",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Login successful\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.have.property('accessToken');",
+                  "    pm.expect(response.user.role).to.eql('funder');",
+                  "    ",
+                  "    // Store token for future requests",
+                  "    pm.collectionVariables.set('funder_token', response.accessToken || response.jwt);",
+                  "    ",
+                  "    console.log('Funder logged in successfully:');",
+                  "    console.log('Name:', response.user.firstName, response.user.surname);",
+                  "    console.log('ID:', response.user.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{funder_email}}\",\n  \"password\": \"{{funder_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Account Information",
+      "item": [
+        {
+          "name": "Get Funder Account Info",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Account info retrieved\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.data).to.have.property('balance');",
+                  "    pm.expect(response.data).to.have.property('accountNumber');",
+                  "    pm.expect(response.data).to.have.property('accountType');",
+                  "    ",
+                  "    console.log('Account Details:');",
+                  "    console.log('Balance:', response.data.balance);",
+                  "    console.log('Account Number:', response.data.accountNumber);",
+                  "    console.log('Account Type:', response.data.accountType);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/funder/deposit/account",
+              "host": ["{{base_url}}"],
+              "path": ["funder", "deposit", "account"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Beneficiaries Management",
+      "item": [
+        {
+          "name": "Get Beneficiaries List",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Beneficiaries retrieved\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.have.property('beneficiaries');",
+                  "    ",
+                  "    if (response.beneficiaries.length > 0) {",
+                  "        const firstBeneficiary = response.beneficiaries[0];",
+                  "        pm.collectionVariables.set('beneficiary_id', firstBeneficiary.id);",
+                  "        ",
+                  "        if (firstBeneficiary.Accounts && firstBeneficiary.Accounts.length > 0) {",
+                  "            pm.collectionVariables.set('account_number', firstBeneficiary.Accounts[0].accountNumber);",
+                  "        }",
+                  "        ",
+                  "        console.log('Found', response.beneficiaries.length, 'beneficiaries');",
+                  "        console.log('First beneficiary:', firstBeneficiary.name || (firstBeneficiary.firstName + ' ' + firstBeneficiary.surname));",
+                  "        console.log('Available accounts:', firstBeneficiary.Accounts ? firstBeneficiary.Accounts.length : 0);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/funder/get-beneficiaries",
+              "host": ["{{base_url}}"],
+              "path": ["funder", "get-beneficiaries"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Transfer Validation Tests",
+      "item": [
+        {
+          "name": "Test - Missing Beneficiary ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Should reject missing beneficiaryId\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.false;",
+                  "    pm.expect(response.message).to.include('Beneficiary ID');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountNumber\": \"{{account_number}}\",\n  \"amount\": 10,\n  \"description\": \"Test transfer without beneficiaryId\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/funder/transfer",
+              "host": ["{{base_url}}"],
+              "path": ["funder", "transfer"]
+            }
+          }
+        },
+        {
+          "name": "Test - Missing Account Number",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Should reject missing accountNumber\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.false;",
+                  "    pm.expect(response.message).to.include('Account number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"beneficiaryId\": {{beneficiary_id}},\n  \"amount\": 10,\n  \"description\": \"Test transfer without accountNumber\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/funder/transfer",
+              "host": ["{{base_url}}"],
+              "path": ["funder", "transfer"]
+            }
+          }
+        },
+        {
+          "name": "Test - Zero Amount",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Should reject zero amount\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.false;",
+                  "    pm.expect(response.message).to.include('Invalid transfer amount');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"beneficiaryId\": {{beneficiary_id}},\n  \"accountNumber\": \"{{account_number}}\",\n  \"amount\": 0,\n  \"description\": \"Test transfer with zero amount\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/funder/transfer",
+              "host": ["{{base_url}}"],
+              "path": ["funder", "transfer"]
+            }
+          }
+        },
+        {
+          "name": "Test - Negative Amount",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Should reject negative amount\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.false;",
+                  "    pm.expect(response.message).to.include('Invalid transfer amount');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"beneficiaryId\": {{beneficiary_id}},\n  \"accountNumber\": \"{{account_number}}\",\n  \"amount\": -10,\n  \"description\": \"Test transfer with negative amount\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/funder/transfer",
+              "host": ["{{base_url}}"],
+              "path": ["funder", "transfer"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Authorization Tests",
+      "item": [
+        {
+          "name": "Test - Unauthorized Beneficiary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Should reject unauthorized beneficiary\", function () {",
+                  "    pm.response.to.have.status(403);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.false;",
+                  "    pm.expect(response.message).to.include('Not authorized');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"beneficiaryId\": 99999,\n  \"accountNumber\": \"{{account_number}}\",\n  \"amount\": 10,\n  \"description\": \"Test transfer to unauthorized beneficiary\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/funder/transfer",
+              "host": ["{{base_url}}"],
+              "path": ["funder", "transfer"]
+            }
+          }
+        },
+        {
+          "name": "Test - Invalid Account Number",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Should reject invalid account number\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.false;",
+                  "    pm.expect(response.message).to.include('account not found');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"beneficiaryId\": {{beneficiary_id}},\n  \"accountNumber\": \"INVALID123\",\n  \"amount\": 10,\n  \"description\": \"Test transfer to invalid account\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/funder/transfer",
+              "host": ["{{base_url}}"],
+              "path": ["funder", "transfer"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Balance Tests",
+      "item": [
+        {
+          "name": "Test - Insufficient Funds",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Should reject insufficient funds\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.false;",
+                  "    pm.expect(response.message).to.include('Insufficient funds');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"beneficiaryId\": {{beneficiary_id}},\n  \"accountNumber\": \"{{account_number}}\",\n  \"amount\": 999999,\n  \"description\": \"Test transfer with insufficient funds\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/funder/transfer",
+              "host": ["{{base_url}}"],
+              "path": ["funder", "transfer"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Successful Transfer",
+      "item": [
+        {
+          "name": "Execute Valid Transfer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Transfer should succeed\", function () {",
+                  "    // This test may fail if insufficient balance",
+                  "    if (pm.response.code === 200) {",
+                  "        const response = pm.response.json();",
+                  "        pm.expect(response.success).to.be.true;",
+                  "        pm.expect(response.data).to.have.property('transferReference');",
+                  "        pm.expect(response.data).to.have.property('amount');",
+                  "        pm.expect(response.data.funder).to.have.property('newBalance');",
+                  "        pm.expect(response.data.beneficiary).to.have.property('newBalance');",
+                  "        ",
+                  "        console.log('Transfer successful!');",
+                  "        console.log('Reference:', response.data.transferReference);",
+                  "        console.log('Amount:', response.data.currency, response.data.amount);",
+                  "        console.log('Funder new balance:', response.data.funder.newBalance);",
+                  "        console.log('Beneficiary new balance:', response.data.beneficiary.newBalance);",
+                  "    } else if (pm.response.code === 400) {",
+                  "        console.log('Transfer failed due to insufficient funds (expected if no balance)');",
+                  "    } else {",
+                  "        pm.expect.fail('Unexpected response code: ' + pm.response.code);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"beneficiaryId\": {{beneficiary_id}},\n  \"accountNumber\": \"{{account_number}}\",\n  \"amount\": 5,\n  \"description\": \"Test successful transfer - Education support\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/funder/transfer",
+              "host": ["{{base_url}}"],
+              "path": ["funder", "transfer"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Transfer History",
+      "item": [
+        {
+          "name": "Get Transfer History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Transfer history retrieved\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.true;",
+                  "    pm.expect(response.data).to.have.property('transfers');",
+                  "    pm.expect(response.data).to.have.property('pagination');",
+                  "    ",
+                  "    console.log('Transfer history:');",
+                  "    console.log('Total transfers:', response.data.transfers.length);",
+                  "    console.log('Current page:', response.data.pagination.currentPage);",
+                  "    console.log('Total pages:', response.data.pagination.totalPages);",
+                  "    ",
+                  "    if (response.data.transfers.length > 0) {",
+                  "        console.log('Recent transactions:');",
+                  "        response.data.transfers.slice(0, 3).forEach((tx, index) => {",
+                  "            console.log(`${index + 1}. ${tx.type}: ZAR ${tx.amount} - ${tx.description}`);",
+                  "        });",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/funder/transfer/history",
+              "host": ["{{base_url}}"],
+              "path": ["funder", "transfer", "history"]
+            }
+          }
+        },
+        {
+          "name": "Get Transfer History - Paginated",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Paginated history works\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.true;",
+                  "    pm.expect(response.data.transfers.length).to.be.at.most(5);",
+                  "    ",
+                  "    console.log('Paginated results:', response.data.transfers.length, 'transfers');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/funder/transfer/history?page=1&limit=5",
+              "host": ["{{base_url}}"],
+              "path": ["funder", "transfer", "history"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -9,6 +9,9 @@ const {
   createProduct,
   updateProduct,
   deleteProduct,
+  getAllCategories,
+  getCategoriesForUser,
+  getCategoriesForDependent,
   getProductsByCategory,
   getProductStats,
   getProductsForDependent,
@@ -31,6 +34,9 @@ const { uploadSingle, uploadMultiple } = require('../middlewares/imageUpload');
 // Get all products with filtering
 router.get('/', getAllProducts);
 
+// Get all categories with product counts (shows all categories to everyone)
+router.get('/categories', getAllCategories);
+
 // Get products by category (must come before /:id route)
 router.get('/category/:category', getProductsByCategory);
 
@@ -41,8 +47,18 @@ router.get('/:id', getProductById);
 router.get('/:id/images', getProductImages);
 
 // ========================================
+// USER ROUTES (Authentication needed)
+// ========================================
+
+// Get categories for any user (includes pregnancy category if eligible)
+router.get('/user/:userId/categories', authMiddleware, getCategoriesForUser);
+
+// ========================================
 // DEPENDENT ROUTES (Authentication needed)
 // ========================================
+
+// Get categories with age-appropriate product counts for dependent
+router.get('/dependent/:dependentId/categories', authMiddleware, getCategoriesForDependent);
 
 // Get age-appropriate products for specific dependent
 router.get('/dependent/:dependentId', authMiddleware, getProductsForDependent);

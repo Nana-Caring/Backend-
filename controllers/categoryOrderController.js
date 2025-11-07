@@ -266,8 +266,8 @@ const checkout = async (req, res) => {
           orderId: order.id,
           productId: cartItem.productId,
           quantity: cartItem.quantity,
-          priceAtOrder: cartItem.priceAtTime,
-          subtotal: itemTotal,
+          priceAtTime: cartItem.priceAtTime,
+          totalPrice: itemTotal,
           productSnapshot: JSON.stringify({
             name: cartItem.product.name,
             brand: cartItem.product.brand,
@@ -284,7 +284,7 @@ const checkout = async (req, res) => {
       transactionRecords.push({
         userId,
         accountId: categoryAccount.id,
-        type: 'debit',
+        type: 'Debit',
         amount: categoryTotal,
         description: `Purchase - Order ${orderNumber} (${category})`,
         category: 'purchase',
@@ -321,7 +321,7 @@ const checkout = async (req, res) => {
       include: [
         {
           model: OrderItem,
-          as: 'orderItems',
+          as: 'items',
           include: [{
             model: Product,
             as: 'product',
@@ -380,7 +380,7 @@ const getOrders = async (req, res) => {
       include: [
         {
           model: OrderItem,
-          as: 'orderItems',
+          as: 'items',
           include: [{
             model: Product,
             as: 'product',
@@ -427,7 +427,7 @@ const getOrderDetails = async (req, res) => {
       include: [
         {
           model: OrderItem,
-          as: 'orderItems',
+          as: 'items',
           include: [{
             model: Product,
             as: 'product',
@@ -477,7 +477,7 @@ const cancelOrder = async (req, res) => {
       include: [
         {
           model: OrderItem,
-          as: 'orderItems',
+          as: 'items',
           include: [{
             model: Product,
             as: 'product',
@@ -516,7 +516,7 @@ const cancelOrder = async (req, res) => {
       // Group order items by category for refund
       const refundsByCategory = {};
       
-      order.orderItems.forEach(item => {
+      order.items.forEach(item => {
         const category = item.product.category;
         if (!refundsByCategory[category]) {
           refundsByCategory[category] = 0;

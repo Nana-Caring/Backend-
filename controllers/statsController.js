@@ -59,7 +59,7 @@ const statsController = {
                     where: {
                         createdAt: {
                             [Op.gte]: firstDayOfMonth
-                        }
+                        } 
                     }
                 }) || 0,
                 

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Funder Deposit Test</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="number"], input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        button:hover:not(:disabled) {
+            background-color: #218838;
+        }
+        .card-element {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+        }
+        .message {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .balance-card {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #007bff;
+        }
+        .test-cards {
+            background-color: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border: 1px solid #ffeaa7;
+        }
+        .test-cards h4 {
+            margin-top: 0;
+            color: #856404;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💰 Funder Deposit Test</h1>
+        
+        <!-- Login Section -->
+        <div id="loginSection">
+            <h3>🔐 Login First</h3>
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="text" id="email" value="funder@demo.com" placeholder="Enter email">
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" value="Demo123!@#" placeholder="Enter password">
+            </div>
+            <button onclick="login()">🔑 Login</button>
+        </div>
+
+        <!-- Balance Display -->
+        <div id="balanceSection" style="display: none;">
+            <div class="balance-card">
+                <h3>💳 Current Balance</h3>
+                <div id="balanceDisplay">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Deposit Section -->
+        <div id="depositSection" style="display: none;">
+            <h3>💸 Make a Deposit</h3>
+            <form id="deposit-form">
+                <div class="form-group">
+                    <label for="amount">Deposit Amount (ZAR):</label>
+                    <input type="number" id="amount" min="10" step="0.01" placeholder="Enter amount (minimum R10.00)">
+                </div>
+                
+                <div class="form-group">
+                    <label>Card Details:</label>
+                    <div id="card-element" class="card-element">
+                        <!-- Stripe Elements will create form elements here -->
+                    </div>
+                </div>
+
+                <button type="submit" id="submit-button">
+                    <span id="button-text">💳 Deposit</span>
+                    <span id="spinner" class="loading" style="display: none;"></span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Messages -->
+        <div id="messages"></div>
+
+        <!-- Test Card Info -->
+        <div class="test-cards">
+            <h4>🧪 Test Card Numbers</h4>
+            <p><strong>Successful Payment:</strong> 4242 4242 4242 4242</p>
+            <p><strong>Declined Payment:</strong> 4000 0000 0000 0002</p>
+            <p><strong>CVV:</strong> Any 3 digits | <strong>Expiry:</strong> Any future date</p>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const STRIPE_PUBLIC_KEY = 'pk_test_51PSqH7ROeQRel9O5i0o1KGqrnuWjnKMFLI8eeDdxfBDGwZUgAYiQ8MlpyKTgOLCFU6P2x2w3D2gGlxqUAXqTPJMR00qlJbLNBL'; // Replace with your actual public key
+        const API_BASE = 'https://nanacaring-backend.onrender.com/api';
+        
+        // Initialize Stripe
+        const stripe = Stripe(STRIPE_PUBLIC_KEY);
+        const elements = stripe.elements();
+        const cardElement = elements.create('card');
+        
+        let authToken = null;
+
+        // Mount card element
+        cardElement.mount('#card-element');
+
+        // Login function
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showMessage('Please enter email and password', 'error');
+                return;
+            }
+
+            try {
+                showMessage('Logging in...', 'info');
+                
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && (data.accessToken || data.jwt)) {
+                    authToken = data.accessToken || data.jwt;
+                    showMessage(`✅ Login successful! Welcome ${data.user.firstName} ${data.user.surname}`, 'success');
+                    
+                    // Hide login section and show deposit section
+                    document.getElementById('loginSection').style.display = 'none';
+                    document.getElementById('balanceSection').style.display = 'block';
+                    document.getElementById('depositSection').style.display = 'block';
+                    
+                    // Load account balance
+                    loadBalance();
+                } else {
+                    showMessage(`❌ Login failed: ${data.error || data.message || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`❌ Login error: ${error.message}`, 'error');
+            }
+        }
+
+        // Load account balance
+        async function loadBalance() {
+            if (!authToken) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/funder/deposit/account`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    const account = data.data;
+                    document.getElementById('balanceDisplay').innerHTML = `
+                        <div style="font-size: 24px; font-weight: bold; color: #007bff;">${account.balance}</div>
+                        <div style="font-size: 14px; color: #6c757d;">
+                            Account: ${account.accountName} (${account.accountNumber})
+                        </div>
+                        <div style="font-size: 12px; color: #6c757d;">
+                            Recent transactions: ${account.transactions.length}
+                        </div>
+                    `;
+                } else {
+                    showMessage(`❌ Failed to load balance: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`❌ Balance error: ${error.message}`, 'error');
+            }
+        }
+
+        // Handle form submission
+        document.getElementById('deposit-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            if (!authToken) {
+                showMessage('❌ Please login first', 'error');
+                return;
+            }
+
+            const amount = parseFloat(document.getElementById('amount').value);
+            
+            if (!amount || amount < 10) {
+                showMessage('❌ Please enter an amount of at least R10.00', 'error');
+                return;
+            }
+
+            setLoading(true);
+            showMessage('💳 Processing your deposit...', 'info');
+
+            try {
+                // Step 1: Create payment intent
+                console.log('Creating payment intent for R' + amount);
+                
+                const intentResponse = await fetch(`${API_BASE}/funder/deposit/create-intent`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        amount: Math.round(amount * 100), // Convert to cents
+                        currency: 'zar'
+                    })
+                });
+
+                const intentData = await intentResponse.json();
+                
+                if (!intentData.success) {
+                    throw new Error(intentData.message || 'Failed to create payment intent');
+                }
+
+                const { clientSecret, paymentIntentId } = intentData.data;
+                console.log('Payment intent created:', paymentIntentId);
+
+                // Step 2: Confirm payment with Stripe
+                showMessage('💳 Confirming payment with Stripe...', 'info');
+                
+                const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+                    payment_method: {
+                        card: cardElement,
+                        billing_details: {
+                            name: 'Funder Name',
+                        },
+                    }
+                });
+
+                if (error) {
+                    throw new Error(`Stripe payment failed: ${error.message}`);
+                }
+
+                console.log('Stripe payment succeeded:', paymentIntent.id);
+
+                // Step 3: Confirm deposit on backend
+                showMessage('✅ Payment successful! Updating your account...', 'info');
+                
+                const confirmResponse = await fetch(`${API_BASE}/funder/deposit/confirm`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        paymentIntentId: paymentIntent.id
+                    })
+                });
+
+                const confirmData = await confirmResponse.json();
+                
+                if (confirmData.success) {
+                    const { amount: depositAmount, newBalance } = confirmData.data;
+                    
+                    showMessage(`🎉 Deposit successful! R${depositAmount.toFixed(2)} has been added to your account. New balance: ZAR ${newBalance.toFixed(2)}`, 'success');
+                    
+                    // Clear form and reload balance
+                    document.getElementById('amount').value = '';
+                    cardElement.clear();
+                    await loadBalance();
+                    
+                } else {
+                    throw new Error(confirmData.message || 'Failed to confirm deposit');
+                }
+
+            } catch (error) {
+                console.error('Deposit error:', error);
+                showMessage(`❌ Deposit failed: ${error.message}`, 'error');
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        // Utility functions
+        function showMessage(text, type) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = text;
+            
+            // Clear previous messages
+            messagesDiv.innerHTML = '';
+            messagesDiv.appendChild(messageDiv);
+            
+            // Auto-remove after 10 seconds for success messages
+            if (type === 'success') {
+                setTimeout(() => {
+                    if (messageDiv.parentNode) {
+                        messageDiv.remove();
+                    }
+                }, 10000);
+            }
+        }
+
+        function setLoading(isLoading) {
+            const submitButton = document.getElementById('submit-button');
+            const buttonText = document.getElementById('button-text');
+            const spinner = document.getElementById('spinner');
+            
+            if (isLoading) {
+                submitButton.disabled = true;
+                buttonText.textContent = 'Processing...';
+                spinner.style.display = 'inline-block';
+            } else {
+                submitButton.disabled = false;
+                buttonText.textContent = '💳 Deposit';
+                spinner.style.display = 'none';
+            }
+        }
+
+        // Initialize
+        console.log('Funder Deposit Test Page Loaded');
+        console.log('API Base:', API_BASE);
+        console.log('Stripe Public Key:', STRIPE_PUBLIC_KEY.substring(0, 20) + '...');
+    </script>
+</body>
+</html>

@@ -1,6 +1,5 @@
-// Load environment variables based on NODE_ENV
-const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
-require('dotenv').config({ path: envFile });
+// Load environment variables from single .env file
+require('dotenv').config();
 const cookieParser = require('cookie-parser'); // For parsing cookies
 
 const express = require('express');
@@ -25,6 +24,9 @@ const categoryOrderRoutes = require('./routes/categoryOrders');
 const categoryAccountRoutes = require('./routes/categoryAccounts');
 const directDepositRoutes = require('./routes/bankAccountRoutes');
 const transactionRoutes = require('./routes/transactions');
+const funderDepositRoutes = require('./routes/funderDepositRoutes');
+const funderTransferRoutes = require('./routes/funderTransferRoutes');
+const pregnancyRoutes = require('./routes/pregnancy');
 
 
 const app = express();
@@ -79,6 +81,9 @@ app.use('/api/category-orders', categoryOrderRoutes);
 app.use('/api/category-accounts', categoryAccountRoutes);
 app.use('/api/direct-deposits', directDepositRoutes);
 app.use('/api/transactions', transactionRoutes);
+app.use('/api/funder/deposit', funderDepositRoutes);
+app.use('/api/funder/transfer', funderTransferRoutes);
+app.use('/api/pregnancy', pregnancyRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -102,9 +107,16 @@ app.use((err, req, res, next) => {
 app.get('/health', (req, res) => {
   res.json({
     success: true,
-    message: 'Server is healthy',
+    message: 'Nana Caring Backend is healthy',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.0.0',
+    features: {
+      orderSystem: 'Enhanced with store codes',
+      transactionTracking: 'Complete history and analytics',
+      paymentProcessing: 'Stripe integration ready',
+      userManagement: 'Multi-role system active'
+    }
   });
 });
 

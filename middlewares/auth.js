@@ -12,7 +12,9 @@ const auth = async (req, res, next) => {
 
     // Extract and clean token
     const token = authHeader.replace('Bearer ', '').trim();
-    console.log('Received token:', token);
+    if (String(process.env.DEBUG_AUTH).toLowerCase() === 'true') {
+      console.log('Received token:', token);
+    }
 
     // Validate token format
     if (!token || !token.match(/^[A-Za-z0-9-_]*\.[A-Za-z0-9-_]*\.[A-Za-z0-9-_]*$/)) {
@@ -42,6 +44,12 @@ const auth = async (req, res, next) => {
       return next();
     }
 
+    // Allow highcourt token (not in DB, same privileges as admin)
+    if (decoded.role === 'highcourt' && !decoded.portal) {
+      req.user = { id: -1, role: 'highcourt', email: process.env.HIGHCOURT_EMAIL, firstName: 'High Court' };
+      return next();
+    }
+
     // Check if regular user still exists
     const user = await User.findByPk(decoded.id);
     if (!user) {
@@ -64,4 +72,28 @@ const auth = async (req, res, next) => {
   }
 };
 
-module.exports = auth;
+// Role-based authorization middleware
+const authorizeRole = (roles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'User not authenticated' 
+      });
+    }
+
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ 
+        success: false, 
+        message: `Access denied. Required roles: ${roles.join(', ')}. Your role: ${req.user.role}` 
+      });
+    }
+
+    next();
+  };
+};
+
+// Export both functions
+module.exports = auth; // Default export for backward compatibility
+module.exports.authenticateToken = auth;
+module.exports.authorizeRole = authorizeRole;

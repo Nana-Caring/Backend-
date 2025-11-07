@@ -9,19 +9,43 @@ const {
     getUserSuspendedEmail, 
     getUserUnblockedEmail, 
     getUserUnsuspendedEmail, 
-    getAccountDeletedEmail 
+    getAccountDeletedEmail,
+    getWelcomeEmail 
 } = require('../utils/emailService');
+const { generateUniqueAccountNumber } = require('../utils/generateUniqueAccountNumber');
 
 // Get all users with filtering
 const getAllUsers = async (req, res) => {
     try {
+        // Debug: list User associations to ensure alias matches
+        if (process.env.DEBUG_ADMIN?.toLowerCase() === 'true') {
+            try {
+                const assoc = User.associations || {};
+                console.log('User associations:', Object.keys(assoc));
+                Object.entries(assoc).forEach(([key, a]) => {
+                    console.log(` - ${key}: target=${a?.target?.name}, as=${a?.as}`);
+                });
+            } catch (e) {
+                console.log('User associations debug failed:', e?.message);
+            }
+        }
         const {
             status,
             role,
             search,
             sortBy = 'createdAt',
-            sortOrder = 'DESC'
+            sortOrder = 'DESC',
+            limit: limitRaw,
+            page: pageRaw
         } = req.query;
+
+        // Sanitize pagination and sorting
+        const allowedSortBy = new Set(['createdAt', 'updatedAt', 'firstName', 'surname', 'email', 'role', 'status']);
+        const sortKey = allowedSortBy.has(String(sortBy)) ? String(sortBy) : 'createdAt';
+        const sortDir = String(sortOrder).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+        const limit = Math.min(Math.max(parseInt(limitRaw ?? '25', 10) || 25, 1), 100);
+        const page = Math.max(parseInt(pageRaw ?? '1', 10) || 1, 1);
+        const offset = (page - 1) * limit;
 
         const whereClause = {};
 
@@ -44,7 +68,7 @@ const getAllUsers = async (req, res) => {
             ];
         }
 
-        const users = await User.findAll({
+        const users = await User.findAndCountAll({
             where: whereClause,
             attributes: [
                 'id', 'firstName', 'middleName', 'surname', 'email', 'role', 'status',
@@ -55,18 +79,25 @@ const getAllUsers = async (req, res) => {
             include: [
                 {
                     model: Account,
-                    as: 'accounts',
+                    as: 'Accounts',
                     attributes: ['id', 'accountNumber', 'accountType', 'balance', 'status']
                 }
             ],
-            order: [[sortBy, sortOrder.toUpperCase()]]
+            // Ensure correct total count when including hasMany associations
+            distinct: true,
+            order: [[sortKey, sortDir]],
+            limit,
+            offset
         });
 
         res.json({
             success: true,
             data: {
-                users: users,
-                total: users.length
+                users: users.rows,
+                total: users.count,
+                page,
+                pageCount: Math.ceil(users.count / limit),
+                limit
             }
         });
 
@@ -90,7 +121,7 @@ const getUserById = async (req, res) => {
             include: [
                 {
                     model: Account,
-                    as: 'accounts',
+                    as: 'Accounts',
                     attributes: ['id', 'accountNumber', 'accountType', 'balance', 'currency', 'status']
                 }
             ]
@@ -422,7 +453,7 @@ const deleteUser = async (req, res) => {
             include: [
                 {
                     model: Account,
-                    as: 'accounts'
+                    as: 'Accounts'
                 }
             ]
         });
@@ -464,7 +495,7 @@ const deleteUser = async (req, res) => {
         // Delete related data if requested
         if (deleteData) {
             // Delete transactions related to user's accounts
-            const accountIds = user.accounts.map(acc => acc.id);
+            const accountIds = (user.Accounts || []).map(acc => acc.id);
             if (accountIds.length > 0) {
                 await Transaction.destroy({
                     where: { accountId: { [Op.in]: accountIds } }
@@ -614,6 +645,255 @@ const checkExpiredSuspensions = async (req, res) => {
     }
 };
 
+// Admin register funder
+const adminRegisterFunder = async (req, res) => {
+    try {
+        const { firstName, middleName, surname, email, password, Idnumber, phoneNumber, 
+                homeAddressLine1, homeAddressLine2, homeCity, homeProvince, homeCode,
+                postalAddressLine1, postalAddressLine2, postalCity, postalProvince, postalCode } = req.body;
+
+        // Validate required fields
+        if (!firstName || !surname || !email || !password || !Idnumber) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Required fields missing: firstName, surname, email, password, Idnumber" 
+            });
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Invalid email format" 
+            });
+        }
+
+        // Validate ID number format (13 digits)
+        if (!/^\d{13}$/.test(Idnumber)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "ID number must be exactly 13 digits" 
+            });
+        }
+
+        // Check if user already exists (by email or ID number)
+        const existingUser = await User.findOne({
+            where: {
+                [Op.or]: [{ email }, { Idnumber }]
+            }
+        });
+
+        if (existingUser) {
+            if (existingUser.email === email) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: "Email already exists" 
+                });
+            }
+            if (existingUser.Idnumber === Idnumber) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: "ID number already exists" 
+                });
+            }
+        }
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Create new funder user
+        const user = await User.create({
+            firstName,
+            middleName: middleName || null,
+            surname,
+            email,
+            password: hashedPassword,
+            role: 'funder',
+            Idnumber,
+            phoneNumber: phoneNumber || null,
+            homeAddressLine1: homeAddressLine1 || null,
+            homeAddressLine2: homeAddressLine2 || null,
+            homeCity: homeCity || null,
+            homeProvince: homeProvince || null,
+            homeCode: homeCode || null,
+            postalAddressLine1: postalAddressLine1 || null,
+            postalAddressLine2: postalAddressLine2 || null,
+            postalCity: postalCity || null,
+            postalProvince: postalProvince || null,
+            postalCode: postalCode || null,
+            status: 'active',
+            isBlocked: false
+        });
+
+        // Create main account for funder
+        const accountNumber = await generateUniqueAccountNumber();
+        const account = await Account.create({
+            userId: user.id,
+            accountType: 'Main',
+            balance: 0,
+            parentAccountId: null,
+            accountNumber: accountNumber,
+        });
+
+        // Remove sensitive data from response
+        const userResponse = user.get({ plain: true });
+        delete userResponse.password;
+        userResponse.account = account;
+
+        // Send welcome email
+        try {
+            const emailHtml = getWelcomeEmail({ 
+                user: userResponse, 
+                password: password // Send original password before hashing
+            });
+            
+            await sendMail({
+                to: user.email,
+                subject: 'Welcome to NANA Portal - Funder Account Created',
+                html: emailHtml
+            });
+            console.log(`Welcome email sent successfully to ${user.email}`);
+        } catch (emailError) {
+            console.error('Failed to send welcome email:', emailError);
+            // Don't fail the registration if email fails
+        }
+
+        res.status(201).json({
+            success: true,
+            message: "Funder registered successfully by admin",
+            user: userResponse
+        });
+
+    } catch (error) {
+        console.error('Admin register funder error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: "Server error", 
+            error: error.message 
+        });
+    }
+};
+
+// Admin register caregiver
+const adminRegisterCaregiver = async (req, res) => {
+    try {
+        const { firstName, middleName, surname, email, password, Idnumber, phoneNumber,
+                homeAddressLine1, homeAddressLine2, homeCity, homeProvince, homeCode,
+                postalAddressLine1, postalAddressLine2, postalCity, postalProvince, postalCode } = req.body;
+
+        // Validate required fields
+        if (!firstName || !surname || !email || !password || !Idnumber) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Required fields missing: firstName, surname, email, password, Idnumber" 
+            });
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Invalid email format" 
+            });
+        }
+
+        // Validate ID number format (13 digits)
+        if (!/^\d{13}$/.test(Idnumber)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "ID number must be exactly 13 digits" 
+            });
+        }
+
+        // Check if user already exists (by email or ID number)
+        const existingUser = await User.findOne({
+            where: {
+                [Op.or]: [{ email }, { Idnumber }]
+            }
+        });
+
+        if (existingUser) {
+            if (existingUser.email === email) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: "Email already exists" 
+                });
+            }
+            if (existingUser.Idnumber === Idnumber) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: "ID number already exists" 
+                });
+            }
+        }
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Create new caregiver user
+        const user = await User.create({
+            firstName,
+            middleName: middleName || null,
+            surname,
+            email,
+            password: hashedPassword,
+            role: 'caregiver',
+            Idnumber,
+            phoneNumber: phoneNumber || null,
+            homeAddressLine1: homeAddressLine1 || null,
+            homeAddressLine2: homeAddressLine2 || null,
+            homeCity: homeCity || null,
+            homeProvince: homeProvince || null,
+            homeCode: homeCode || null,
+            postalAddressLine1: postalAddressLine1 || null,
+            postalAddressLine2: postalAddressLine2 || null,
+            postalCity: postalCity || null,
+            postalProvince: postalProvince || null,
+            postalCode: postalCode || null,
+            status: 'active',
+            isBlocked: false
+        });
+
+        // Remove sensitive data from response
+        const userResponse = user.get({ plain: true });
+        delete userResponse.password;
+
+        // Send welcome email
+        try {
+            const emailHtml = getWelcomeEmail({ 
+                user: userResponse, 
+                password: password // Send original password before hashing
+            });
+            
+            await sendMail({
+                to: user.email,
+                subject: 'Welcome to NANA Portal - Caregiver Account Created',
+                html: emailHtml
+            });
+            console.log(`Welcome email sent successfully to ${user.email}`);
+        } catch (emailError) {
+            console.error('Failed to send welcome email:', emailError);
+            // Don't fail the registration if email fails
+        }
+
+        res.status(201).json({
+            success: true,
+            message: "Caregiver registered successfully by admin",
+            user: userResponse
+        });
+
+    } catch (error) {
+        console.error('Admin register caregiver error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: "Server error", 
+            error: error.message 
+        });
+    }
+};
+
 module.exports = {
     getAllUsers,
     getUserById,
@@ -623,5 +903,7 @@ module.exports = {
     unsuspendUser,
     deleteUser,
     getUserStats,
-    checkExpiredSuspensions
+    checkExpiredSuspensions,
+    adminRegisterFunder,
+    adminRegisterCaregiver
 };

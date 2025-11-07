@@ -25,7 +25,7 @@ const checkout = async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {
-    const { shippingAddress, paymentMethod = 'account_balance' } = req.body;
+    const { shippingAddress, address, fulfillmentType = 'pickup', paymentMethod = 'account_balance' } = req.body;
     const userId = req.user.id;
 
     // Validate input
@@ -141,6 +141,39 @@ const checkout = async (req, res) => {
       });
     }
 
+    // Prepare shipping/collection address (pickup-first)
+    let computedShipping = shippingAddress || null;
+    if (!computedShipping) {
+      // If flat address provided, map it
+      if (address && typeof address === 'string') {
+        computedShipping = {
+          fullName: `${req.user.firstName || user.firstName || ''} ${req.user.surname || user.surname || req.user.lastName || user.lastName || ''}`.trim(),
+          address1: address
+        };
+      } else {
+        // Fallback to user's saved addresses (home first, then postal)
+        const addrLine1 = user.homeAddressLine1 || user.postalAddressLine1 || null;
+        const addrLine2 = user.homeAddressLine2 || user.postalAddressLine2 || null;
+        const city = user.homeCity || user.postalCity || null;
+        const province = user.homeProvince || user.postalProvince || null;
+        const code = user.homeCode || user.postalCode || null;
+        if (addrLine1 || city || province || code) {
+          computedShipping = {
+            fullName: `${user.firstName} ${user.surname || user.lastName || ''}`.trim(),
+            address1: addrLine1 || undefined,
+            address2: addrLine2 || undefined,
+            city: city || undefined,
+            province: province || undefined,
+            postalCode: code || undefined
+          };
+        }
+      }
+    }
+    // Always embed fulfillmentType for clarity (even though we store in shippingAddress column)
+    if (computedShipping) {
+      computedShipping.fulfillmentType = fulfillmentType || 'pickup';
+    }
+
     // Create order
     const orderNumber = generateOrderNumber();
     let storeCode = generateStoreCode();
@@ -159,7 +192,7 @@ const checkout = async (req, res) => {
       paymentMethod,
       paymentStatus: 'pending',
       orderStatus: 'processing',
-      shippingAddress: shippingAddress ? JSON.stringify(shippingAddress) : null
+      shippingAddress: computedShipping ? JSON.stringify(computedShipping) : null
     }, { transaction });
 
     // Create order items with detailed product snapshots
@@ -167,8 +200,8 @@ const checkout = async (req, res) => {
       orderId: order.id,
       productId: cartItem.productId,
       quantity: cartItem.quantity,
-      priceAtOrder: currentPrice,
-      subtotal: currentPrice * cartItem.quantity,
+      priceAtTime: currentPrice,
+      totalPrice: currentPrice * cartItem.quantity,
       productSnapshot: JSON.stringify({
         id: cartItem.product.id,
         name: cartItem.product.name,
@@ -186,7 +219,7 @@ const checkout = async (req, res) => {
         weight: cartItem.product.weight,
         dimensions: cartItem.product.dimensions,
         manufacturer: cartItem.product.manufacturer,
-        priceAtOrder: currentPrice
+        priceAtTime: currentPrice
       })
     }));
 
@@ -200,7 +233,7 @@ const checkout = async (req, res) => {
     await Transaction.create({
       userId,
       accountId: account.id,
-      type: 'debit',
+      type: 'Debit',
       amount: totalAmount,
       description: `Purchase - Order ${orderNumber}`,
       category: 'purchase',
@@ -229,7 +262,7 @@ const checkout = async (req, res) => {
       include: [
         {
           model: OrderItem,
-          as: 'orderItems',
+          as: 'items',
           include: [{
             model: Product,
             as: 'product',
@@ -239,7 +272,7 @@ const checkout = async (req, res) => {
         {
           model: User,
           as: 'user',
-          attributes: ['firstName', 'lastName', 'email']
+          attributes: ['firstName', 'surname', 'email']
         }
       ]
     });
@@ -249,6 +282,10 @@ const checkout = async (req, res) => {
       message: 'Order placed successfully',
       data: {
         order: completeOrder,
+        collection: {
+          mode: fulfillmentType || 'pickup',
+          pickupHint: computedShipping ? [computedShipping.city, computedShipping.province].filter(Boolean).join(', ') : null
+        },
         unavailableItems: unavailableItems.length > 0 ? unavailableItems : undefined
       }
     });
@@ -282,7 +319,7 @@ const getOrders = async (req, res) => {
       include: [
         {
           model: OrderItem,
-          as: 'orderItems',
+          as: 'items',
           include: [{
             model: Product,
             as: 'product',
@@ -332,7 +369,7 @@ const getOrderDetails = async (req, res) => {
       include: [
         {
           model: OrderItem,
-          as: 'orderItems',
+          as: 'items',
           include: [{
             model: Product,
             as: 'product',
@@ -347,7 +384,7 @@ const getOrderDetails = async (req, res) => {
         {
           model: User,
           as: 'user',
-          attributes: ['firstName', 'lastName', 'email']
+          attributes: ['firstName', 'surname', 'email']
         }
       ]
     });
@@ -360,7 +397,7 @@ const getOrderDetails = async (req, res) => {
     }
 
     // Parse product snapshots and merge with current product data
-    const enhancedOrderItems = order.orderItems.map(item => {
+    const enhancedOrderItems = order.items.map(item => {
       let productSnapshot = {};
       try {
         productSnapshot = JSON.parse(item.productSnapshot || '{}');
@@ -391,6 +428,14 @@ const getOrderDetails = async (req, res) => {
     const orderWithDetails = {
       ...order.toJSON(),
       orderItems: enhancedOrderItems,
+      collection: (() => {
+        let s = {};
+        try { s = JSON.parse(order.shippingAddress || '{}'); } catch {}
+        return {
+          mode: s.fulfillmentType || 'pickup',
+          pickupHint: [s.city, s.province].filter(Boolean).join(', ') || null
+        };
+      })(),
       storeInstructions: {
         code: order.storeCode,
         message: `Present this code at checkout: ${order.storeCode}`,
@@ -427,7 +472,7 @@ const getOrderByStoreCode = async (req, res) => {
       include: [
         {
           model: OrderItem,
-          as: 'orderItems',
+          as: 'items',
           include: [{
             model: Product,
             as: 'product',
@@ -440,7 +485,7 @@ const getOrderByStoreCode = async (req, res) => {
         {
           model: User,
           as: 'user',
-          attributes: ['firstName', 'lastName', 'email']
+          attributes: ['firstName', 'surname', 'email']
         }
       ]
     });
@@ -453,7 +498,7 @@ const getOrderByStoreCode = async (req, res) => {
     }
 
     // Parse product snapshots for detailed display
-    const enhancedOrderItems = order.orderItems.map(item => {
+    const enhancedOrderItems = order.items.map(item => {
       let productSnapshot = {};
       try {
         productSnapshot = JSON.parse(item.productSnapshot || '{}');
@@ -475,16 +520,35 @@ const getOrderByStoreCode = async (req, res) => {
       };
     });
 
+    // Basic validity checks for in-store verification
+    const isValid = order.paymentStatus === 'completed'
+      && order.orderStatus !== 'cancelled'
+      && parseFloat(order.totalAmount) > 0
+      && enhancedOrderItems.length > 0;
+
+    const shipping = (() => { try { return JSON.parse(order.shippingAddress || '{}'); } catch { return {}; } })();
+
     const orderForStore = {
       ...order.toJSON(),
       orderItems: enhancedOrderItems,
       verificationInfo: {
         storeCode: order.storeCode,
-        customerName: `${order.user.firstName} ${order.user.lastName}`,
+        customerName: `${order.user.firstName} ${order.user.surname || ''}`.trim(),
         orderDate: order.createdAt,
         orderStatus: order.orderStatus,
         paymentStatus: order.paymentStatus,
-        totalAmount: order.totalAmount
+        totalAmount: order.totalAmount,
+        isValid,
+        reasons: isValid ? [] : [
+          order.paymentStatus !== 'completed' ? 'Payment not completed' : null,
+          order.orderStatus === 'cancelled' ? 'Order cancelled' : null,
+          !(parseFloat(order.totalAmount) > 0) ? 'Invalid order amount' : null,
+          enhancedOrderItems.length === 0 ? 'No items in order' : null
+        ].filter(Boolean)
+      },
+      collection: {
+        mode: (shipping && shipping.fulfillmentType) || 'pickup',
+        pickupHint: [shipping?.city, shipping?.province].filter(Boolean).join(', ') || null
       }
     };
 
@@ -586,10 +650,229 @@ const cancelOrder = async (req, res) => {
   }
 };
 
+// POS: Confirm order is picked/packed and ready for collection
+const confirmPickup = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  
+  try {
+    const { orderId } = req.params;
+    const { staffId, notes } = req.body;
+
+    // Find order
+    const order = await Order.findOne({
+      where: { id: orderId },
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['firstName', 'surname', 'email']
+      }],
+      transaction
+    });
+
+    if (!order) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Only processing orders can be confirmed
+    if (order.orderStatus !== 'processing') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Order status is ${order.orderStatus}, cannot confirm. Expected: processing`
+      });
+    }
+
+    // Update order status
+    await order.update({
+      orderStatus: 'ready_for_pickup',
+      confirmedAt: new Date(),
+      fulfillmentNotes: notes || `Confirmed by staff: ${staffId}`
+    }, { transaction });
+
+    await transaction.commit();
+
+    res.json({
+      success: true,
+      message: 'Order confirmed and ready for pickup',
+      data: {
+        order: {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          storeCode: order.storeCode,
+          orderStatus: 'ready_for_pickup',
+          confirmedAt: order.confirmedAt,
+          customerName: `${order.user.firstName} ${order.user.surname}`,
+          notes: notes
+        }
+      }
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Confirm pickup error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to confirm pickup',
+      error: error.message
+    });
+  }
+};
+
+// POS: Mark order as collected by dependent
+const markCollected = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  
+  try {
+    const { orderId } = req.params;
+    const { collectionMethod = 'in_store_pickup', notes, staffId } = req.body;
+
+    // Find order
+    const order = await Order.findOne({
+      where: { id: orderId },
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['firstName', 'surname', 'email']
+      }, {
+        model: OrderItem,
+        as: 'items',
+        attributes: ['quantity', 'priceAtTime', 'totalPrice', 'productSnapshot']
+      }],
+      transaction
+    });
+
+    if (!order) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Only ready_for_pickup orders can be marked as collected
+    if (order.orderStatus !== 'ready_for_pickup' && order.orderStatus !== 'processing') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Order status is ${order.orderStatus}, cannot collect. Expected: ready_for_pickup or processing`
+      });
+    }
+
+    // Update order status
+    await order.update({
+      orderStatus: 'delivered',
+      collectedAt: new Date(),
+      fulfillmentMethod: collectionMethod,
+      fulfillmentNotes: notes || `Collected by staff: ${staffId}`
+    }, { transaction });
+
+    await transaction.commit();
+
+    res.json({
+      success: true,
+      message: 'Order marked as collected',
+      data: {
+        order: {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          storeCode: order.storeCode,
+          orderStatus: 'delivered',
+          collectedAt: order.collectedAt,
+          collectionMethod: collectionMethod,
+          customerName: `${order.user.firstName} ${order.user.surname}`,
+          totalAmount: order.totalAmount,
+          itemCount: order.items?.length || 0,
+          notes: notes
+        }
+      }
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Mark collected error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark order as collected',
+      error: error.message
+    });
+  }
+};
+
+// List pending orders (for POS/retailer to see all orders waiting for pickup)
+const getPendingOrders = async (req, res) => {
+  try {
+    const orders = await Order.findAll({
+      where: {
+        orderStatus: ['processing', 'ready_for_pickup']
+      },
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['firstName', 'surname', 'Idnumber']
+      }, {
+        model: OrderItem,
+        as: 'items',
+        attributes: ['quantity', 'priceAtTime', 'productSnapshot']
+      }],
+      order: [['createdAt', 'DESC']],
+      limit: 50
+    });
+
+    res.json({
+      success: true,
+      message: 'Pending orders retrieved',
+      data: orders.map(order => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        storeCode: order.storeCode,
+        customerName: `${order.user.firstName} ${order.user.surname}`,
+        customerAge: calculateAge(order.user.Idnumber),
+        totalAmount: order.totalAmount,
+        itemCount: order.items?.length || 0,
+        orderStatus: order.orderStatus,
+        createdAt: order.createdAt,
+        confirmedAt: order.confirmedAt
+      }))
+    });
+
+  } catch (error) {
+    console.error('Get pending orders error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve pending orders',
+      error: error.message
+    });
+  }
+};
+
+// Helper: calculate age from Idnumber
+const calculateAge = (idnumber) => {
+  if (!idnumber || idnumber.length < 6) return null;
+  const year = parseInt(idnumber.substring(0, 2));
+  const month = parseInt(idnumber.substring(2, 4));
+  const day = parseInt(idnumber.substring(4, 6));
+  const fullYear = year <= new Date().getFullYear() % 100 ? 2000 + year : 1900 + year;
+  const birthDate = new Date(fullYear, month - 1, day);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+};
+
 module.exports = {
   checkout,
   getOrders,
   getOrderDetails,
   getOrderByStoreCode,
-  cancelOrder
+  cancelOrder,
+  confirmPickup,
+  markCollected,
+  getPendingOrders
 };

@@ -245,7 +245,7 @@ const transferBetweenCategories = async (req, res) => {
       {
         userId,
         accountId: fromAccount.id,
-        type: 'debit',
+        type: 'Debit',
         amount: transferAmount,
         description: `${transferDescription} (Outgoing)`,
         category: 'transfer',

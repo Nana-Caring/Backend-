@@ -16,7 +16,12 @@ module.exports = (sequelize, DataTypes) => {
     customName: {
       type: DataTypes.STRING(100),
       allowNull: true,
-      comment: 'Custom name/alias that funder gives to the dependent for easy identification'
+      comment: 'Custom name/alias that funder gives to the dependent (can be different from actual name)'
+    },
+    notes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      comment: 'Additional notes about the dependent from the funder\'s perspective'
     }
   });
 
@@ -26,7 +31,7 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: 'funderId',
       as: 'funder'
     });
-
+    
     // FunderDependent belongs to User (dependent)
     FunderDependent.belongsTo(models.User, {
       foreignKey: 'dependentId',

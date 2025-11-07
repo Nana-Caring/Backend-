@@ -9,6 +9,7 @@ const getAllProducts = async (req, res) => {
     const {
       category,
       brand,
+      shop,
       inStock,
       isActive = true,
       search,
@@ -31,6 +32,11 @@ const getAllProducts = async (req, res) => {
     // Apply filters
     if (category) where.category = category;
     if (brand) where.brand = brand;
+    // Optional shop filter (case-insensitive)
+    if (shop) {
+      const { Op } = require('sequelize');
+      where.shop = { [Op.iLike]: shop };
+    }
     if (inStock !== undefined) where.inStock = inStock === 'true';
 
     // Search functionality
@@ -74,23 +80,38 @@ const getAllProducts = async (req, res) => {
   }
 };
 
-// Get product by ID
+// Get product by ID or SKU
 const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const product = await Product.findOne({
-      where: { 
-        id, 
+    // Check if the id parameter is numeric (actual ID) or string (SKU)
+    const isNumericId = !isNaN(parseInt(id)) && parseInt(id).toString() === id;
+    
+    let whereClause;
+    if (isNumericId) {
+      // Search by actual database ID
+      whereClause = { 
+        id: parseInt(id), 
         isActive: true 
-      },
+      };
+    } else {
+      // Search by SKU
+      whereClause = { 
+        sku: id, 
+        isActive: true 
+      };
+    }
+    
+    const product = await Product.findOne({
+      where: whereClause,
       attributes: { exclude: ['createdBy', 'updatedBy'] }
     });
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found'
+        message: `Product not found with ${isNumericId ? 'ID' : 'SKU'}: ${id}`
       });
     }
 
@@ -233,12 +254,319 @@ const deleteProduct = async (req, res) => {
   }
 };
 
+// Get all categories with product counts (shows all categories to everyone)
+const getAllCategories = async (req, res) => {
+  try {
+    const { Op } = require('sequelize');
+    
+    // Get all categories with product counts
+    const categoryStats = await Product.findAll({
+      attributes: [
+        'category',
+        [Product.sequelize.fn('COUNT', Product.sequelize.col('id')), 'productCount'],
+        [Product.sequelize.fn('AVG', Product.sequelize.col('price')), 'avgPrice']
+      ],
+      where: { 
+        isActive: true,
+        inStock: true 
+      },
+      group: ['category'],
+      order: [['category', 'ASC']],
+      raw: true
+    });
+
+    // Base categories (excluding Pregnancy - it's conditionally shown)
+    const baseCategories = ['Education', 'Healthcare', 'Groceries', 'Entertainment', 'Other'];
+    const result = baseCategories.map(category => {
+      const stats = categoryStats.find(stat => stat.category === category);
+      return {
+        category,
+        productCount: stats ? parseInt(stats.productCount) : 0,
+        avgPrice: stats ? parseFloat(stats.avgPrice).toFixed(2) : '0.00',
+        isAvailable: stats ? parseInt(stats.productCount) > 0 : false
+      };
+    });
+
+    res.json({
+      success: true,
+      message: 'All categories retrieved successfully',
+      data: result,
+      totalCategories: baseCategories.length,
+      availableCategories: result.filter(cat => cat.isAvailable).length,
+      note: 'Pregnancy category is only visible to pregnant users, caregivers of infants, or unborn dependents'
+    });
+  } catch (error) {
+    console.error('Get all categories error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch categories',
+      error: error.message
+    });
+  }
+};
+
+// Get categories including pregnancy-specific ones for eligible users
+const getCategoriesForUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { Op } = require('sequelize');
+
+    // Get user details (can be dependent, caregiver, or funder)
+    const user = await User.findOne({
+      where: { 
+        id: userId,
+        isBlocked: false
+      },
+      attributes: ['id', 'firstName', 'surname', 'role', 'isPregnant', 'isInfant', 'isUnborn']
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found or access denied'
+      });
+    }
+
+    // Check if user is eligible for pregnancy category
+    const isPregnancyEligible = user.isPregnant || user.isInfant || user.isUnborn;
+    
+    // If user is a caregiver, also check if they have pregnant/infant/unborn dependents
+    let hasPregnantDependents = false;
+    if (user.role === 'caregiver') {
+      const pregnantDependentCount = await User.count({
+        where: {
+          parentCaregiverId: userId,
+          [Op.or]: [
+            { isPregnant: true },
+            { isInfant: true },
+            { isUnborn: true }
+          ]
+        }
+      });
+      hasPregnantDependents = pregnantDependentCount > 0;
+    }
+
+    // Determine which categories to show
+    const baseCategories = ['Education', 'Healthcare', 'Groceries', 'Entertainment', 'Other'];
+    const categoriesToShow = [...baseCategories];
+    
+    if (isPregnancyEligible || hasPregnantDependents) {
+      categoriesToShow.push('Pregnancy');
+    }
+
+    // Get category stats for eligible categories
+    const categoryStats = await Product.findAll({
+      attributes: [
+        'category',
+        [Product.sequelize.fn('COUNT', Product.sequelize.col('id')), 'productCount'],
+        [Product.sequelize.fn('AVG', Product.sequelize.col('price')), 'avgPrice']
+      ],
+      where: { 
+        isActive: true,
+        inStock: true,
+        category: { [Op.in]: categoriesToShow }
+      },
+      group: ['category'],
+      order: [['category', 'ASC']],
+      raw: true
+    });
+
+    const result = categoriesToShow.map(category => {
+      const stats = categoryStats.find(stat => stat.category === category);
+      return {
+        category,
+        productCount: stats ? parseInt(stats.productCount) : 0,
+        avgPrice: stats ? parseFloat(stats.avgPrice).toFixed(2) : '0.00',
+        isAvailable: stats ? parseInt(stats.productCount) > 0 : false,
+        isPregnancyRelated: category === 'Pregnancy'
+      };
+    });
+
+    res.json({
+      success: true,
+      message: 'User categories retrieved successfully',
+      data: result,
+      user: {
+        id: user.id,
+        name: `${user.firstName} ${user.surname}`,
+        role: user.role,
+        pregnancyEligible: isPregnancyEligible || hasPregnantDependents,
+        eligibilityReason: isPregnancyEligible 
+          ? (user.isPregnant ? 'User is pregnant' : user.isInfant ? 'User is infant' : 'User is unborn')
+          : hasPregnantDependents ? 'Has pregnant/infant dependents' : 'Not eligible'
+      },
+      totalCategories: categoriesToShow.length,
+      availableCategories: result.filter(cat => cat.isAvailable).length
+    });
+  } catch (error) {
+    console.error('Get categories for user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch user categories',
+      error: error.message
+    });
+  }
+};
+
+// Get categories with age-appropriate product counts for a specific dependent
+const getCategoriesForDependent = async (req, res) => {
+  try {
+    const { dependentId } = req.params;
+    const { Op } = require('sequelize');
+
+    // Get dependent user details
+    const dependent = await User.findOne({
+      where: { 
+        id: dependentId,
+        role: 'dependent',
+        isBlocked: false
+      },
+      attributes: ['id', 'firstName', 'surname', 'Idnumber', 'role', 'isPregnant', 'isInfant', 'isUnborn']
+    });
+
+    if (!dependent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Dependent not found or access denied'
+      });
+    }
+
+    // Calculate age from ID number
+    const ageInfo = calculateAgeFromSAId(dependent.Idnumber);
+    
+    if (!ageInfo.isValid) {
+      return res.status(400).json({
+        success: false,
+        errorCode: 'INVALID_IDNUMBER',
+        message: 'Invalid ID number - cannot determine age',
+        error: ageInfo.error,
+        dependent: {
+          id: dependent.id,
+          name: `${dependent.firstName} ${dependent.surname}`.trim(),
+          Idnumber: dependent.Idnumber
+        }
+      });
+    }
+
+    const userAge = ageInfo.age;
+
+    // Check if dependent is eligible for pregnancy category
+    const isPregnancyEligible = dependent.isPregnant || dependent.isInfant || dependent.isUnborn;
+
+    // Determine which categories to include
+    const baseCategories = ['Education', 'Healthcare', 'Groceries', 'Entertainment', 'Other'];
+    const categoriesToInclude = [...baseCategories];
+    
+    if (isPregnancyEligible) {
+      categoriesToInclude.push('Pregnancy');
+    }
+
+    // Get age-appropriate product counts by category
+    const categoryStats = await Product.findAll({
+      attributes: [
+        'category',
+        [Product.sequelize.fn('COUNT', Product.sequelize.col('id')), 'availableProducts']
+      ],
+      where: {
+        isActive: true,
+        inStock: true,
+        category: { [Op.in]: categoriesToInclude },
+        [Op.and]: [
+          {
+            [Op.or]: [
+              { minAge: null },
+              { minAge: { [Op.lte]: userAge } }
+            ]
+          },
+          {
+            [Op.or]: [
+              { maxAge: null },
+              { maxAge: { [Op.gte]: userAge } }
+            ]
+          }
+        ]
+      },
+      group: ['category'],
+      order: [['category', 'ASC']],
+      raw: true
+    });
+
+    // Get total product counts for comparison
+    const totalCategoryStats = await Product.findAll({
+      attributes: [
+        'category',
+        [Product.sequelize.fn('COUNT', Product.sequelize.col('id')), 'totalProducts']
+      ],
+      where: { 
+        isActive: true,
+        inStock: true,
+        category: { [Op.in]: categoriesToInclude }
+      },
+      group: ['category'],
+      order: [['category', 'ASC']],
+      raw: true
+    });
+
+    // Build complete category list with age restrictions (only eligible categories)
+    const allCategories = categoriesToInclude;
+    const result = allCategories.map(category => {
+      const availableStats = categoryStats.find(stat => stat.category === category);
+      const totalStats = totalCategoryStats.find(stat => stat.category === category);
+      
+      const availableProducts = availableStats ? parseInt(availableStats.availableProducts) : 0;
+      const totalProducts = totalStats ? parseInt(totalStats.totalProducts) : 0;
+      const restrictedProducts = totalProducts - availableProducts;
+
+      return {
+        category,
+        availableProducts,
+        totalProducts,
+        restrictedProducts,
+        hasRestrictions: restrictedProducts > 0,
+        isAccessible: availableProducts > 0,
+        restrictionReason: restrictedProducts > 0 ? `${restrictedProducts} product(s) age-restricted` : null,
+        isPregnancyRelated: category === 'Pregnancy'
+      };
+    });
+
+    res.json({
+      success: true,
+      message: 'Age-appropriate categories retrieved successfully',
+      data: result,
+      dependent: {
+        id: dependent.id,
+        name: `${dependent.firstName} ${dependent.surname}`,
+        age: userAge,
+        ageCategory: ageInfo.ageCategory,
+        pregnancyEligible: isPregnancyEligible,
+        pregnancyStatus: {
+          isPregnant: dependent.isPregnant,
+          isInfant: dependent.isInfant,
+          isUnborn: dependent.isUnborn
+        }
+      },
+      summary: {
+        totalCategories: allCategories.length,
+        accessibleCategories: result.filter(cat => cat.isAccessible).length,
+        categoriesWithRestrictions: result.filter(cat => cat.hasRestrictions).length
+      }
+    });
+  } catch (error) {
+    console.error('Get categories for dependent error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch age-appropriate categories',
+      error: error.message
+    });
+  }
+};
+
 // Admin: Get products by category (for account management)
 const getProductsByCategory = async (req, res) => {
   try {
     const { category } = req.params;
     
-    const validCategories = ['Education', 'Healthcare', 'Groceries', 'Transport', 'Entertainment', 'Other'];
+    const validCategories = ['Education', 'Healthcare', 'Groceries', 'Entertainment', 'Other', 'Pregnancy'];
     if (!validCategories.includes(category)) {
       return res.status(400).json({
         success: false,
@@ -350,8 +678,14 @@ const getProductsForDependent = async (req, res) => {
     if (!ageInfo.isValid) {
       return res.status(400).json({
         success: false,
+        errorCode: 'INVALID_IDNUMBER',
         message: 'Invalid ID number - cannot determine age',
-        error: ageInfo.error
+        error: ageInfo.error,
+        dependent: {
+          id: dependent.id,
+          name: `${dependent.firstName} ${dependent.surname}`.trim(),
+          Idnumber: dependent.Idnumber
+        }
       });
     }
 
@@ -473,8 +807,14 @@ const validateProductAccess = async (req, res) => {
     if (!ageInfo.isValid) {
       return res.status(400).json({
         success: false,
+        errorCode: 'INVALID_IDNUMBER',
         message: 'Invalid ID number - cannot verify age',
-        error: ageInfo.error
+        error: ageInfo.error,
+        dependent: {
+          id: dependent.id,
+          name: `${dependent.firstName} ${dependent.surname}`.trim(),
+          Idnumber: dependent.Idnumber
+        }
       });
     }
 
@@ -728,6 +1068,9 @@ module.exports = {
   createProduct,
   updateProduct,
   deleteProduct,
+  getAllCategories,
+  getCategoriesForUser,
+  getCategoriesForDependent,
   getProductsByCategory,
   getProductStats,
   getProductsForDependent,

@@ -37,6 +37,48 @@ module.exports = (sequelize, DataTypes) => {
         timestamp: {
             type: DataTypes.DATE,
             defaultValue: DataTypes.NOW
+        },
+        // Enhanced fields for better transaction clarity
+        senderName: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            comment: 'Name of the person/entity sending money'
+        },
+        senderAccountNumber: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            comment: 'Account number money is coming from'
+        },
+        recipientName: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            comment: 'Name of the person receiving money'
+        },
+        recipientAccountNumber: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            comment: 'Account number money is going to'
+        },
+        transactionCategory: {
+            type: DataTypes.ENUM(
+                'fund_transfer', 
+                'purchase', 
+                'allowance', 
+                'emergency_fund',
+                'smart_distribution', 
+                'manual_transfer', 
+                'refund', 
+                'fee',
+                'deposit',
+                'withdrawal'
+            ),
+            allowNull: true,
+            comment: 'Category of transaction for better organization'
+        },
+        merchantName: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            comment: 'For purchases - name of store/merchant'
         }
     }, {
         tableName: 'Transactions',

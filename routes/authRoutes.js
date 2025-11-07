@@ -1,8 +1,9 @@
 const express = require("express");
 const { check, validationResult } = require("express-validator");
 const rateLimit = require("express-rate-limit");
-const { register, login, getUser, registerDependent, adminLogin, verifyResetToken } = require("../controllers/authController");
-const authMiddleware = require("../middlewares/auth");
+const { register, login, getUser, registerDependent, adminLogin, verifyResetToken, retailerLogin } = require("../controllers/authController");
+const { authenticateToken } = require("../middlewares/auth");
+const authMiddleware = authenticateToken; // For backward compatibility
 
 
 const router = express.Router();
@@ -20,13 +21,24 @@ router.post(
 // ADMIN LOGIN
 router.post("/admin-login", adminLogin);
 
+// RETAILER LOGIN
+router.post(
+  "/retailer-login",
+  [
+    check("email", "Include a valid email").isEmail(),
+    check("password", "Password is required").exists(),
+    check("storeId", "Store ID is optional").optional().isString()
+  ],
+  retailerLogin
+);
+
 // REGISTER (Funder or Caregiver)
 router.post(
   "/register",
   [
-    check("firstName", "First name is required").not().isEmpty(),
-    check("lastName", "Last name is required").not().isEmpty(),
-    check("surname", "Surname is required").not().isEmpty(),
+    check("firstName", "First name is required").not().isEmpty().trim(),
+    check("middleName", "Middle name is optional").optional().trim(),
+    check("surname", "Surname is required").not().isEmpty().trim(),
     check("email", "Include a valid email").isEmail(),
     check("password", "Password must be at least 6 characters").isLength({ min: 6 }),
     check("role", "Role must be either funder or caregiver").isIn(["funder", "caregiver"]),
@@ -35,18 +47,23 @@ router.post(
   register
 );
 
-// REGISTER DEPENDENT (by Caregiver)
+// REGISTER DEPENDENT (by Caregiver or Funder)
 router.post(
   "/register-dependent",
   [
     authMiddleware,
-    check("firstName", "First name is required").not().isEmpty(),
-    check("lastName", "Last name is required").not().isEmpty(),
-    check("surname", "Surname is required").not().isEmpty(),
+    check("firstName", "First name is required").not().isEmpty().trim(),
+    check("middleName", "Middle name is optional").optional().trim(),
+    check("surname", "Surname is required").not().isEmpty().trim(),
+    check("email", "Valid email is required").isEmail(),
+    check("password", "Password must be at least 6 characters").isLength({ min: 6 }),
     check("Idnumber", "Valid 13-digit numeric ID number required").isLength({ min: 13, max: 13 }).isNumeric(),
-    check("relation", "Relation is required").not().isEmpty(),
+    check("relation", "Relation is required").not().isEmpty().trim(),
+    check("customName", "Custom display name is required").not().isEmpty().isLength({ min: 1, max: 100 }).trim(),
+    check("notes", "Notes are optional").optional().isLength({ max: 500 }).trim(),
   ],
   registerDependent
+  
 );
 
 // GET CURRENT USER

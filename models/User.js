@@ -33,17 +33,72 @@ const User = sequelize.define('User', {
     allowNull: false
   },
   role: {
-    type: DataTypes.ENUM('funder', 'caregiver', 'dependent'),
+    type: DataTypes.ENUM('funder', 'caregiver', 'dependent', 'highcourt', 'retailer'),
     allowNull: false
   },
   Idnumber: {
     type: DataTypes.STRING(13),
     allowNull: false,
-    unique: true
+    unique: true,
+    validate: {
+      // Must be exactly 13 numeric digits (South African ID format)
+      isThirteenDigits(value) {
+        if (value === null || value === undefined) return;
+        const trimmed = String(value).trim();
+        if (!/^\d{13}$/.test(trimmed)) {
+          throw new Error('Idnumber must be exactly 13 numeric digits');
+        }
+      }
+    }
   },
   relation: {
     type: DataTypes.STRING,
     allowNull: true
+  },
+  // Pregnancy/Infant support fields
+  isPregnant: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  },
+  expectedDueDate: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  isInfant: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  },
+  isUnborn: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  },
+  dateOfBirth: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  parentCaregiverId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
+  },
+  calculatedAge: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      const dob = this.getDataValue('dateOfBirth');
+      if (!dob) return null;
+      const today = new Date();
+      const birth = new Date(dob);
+      let age = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+      return Math.max(0, age);
+    }
   },
   // User blocking/status fields
   isBlocked: {
@@ -169,6 +224,13 @@ const User = sequelize.define('User', {
     type: DataTypes.BIGINT,
     allowNull: true,
     comment: 'Expiration timestamp for reset token'
+  },
+  customName: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    validate: {
+      len: [1, 100]
+    }
   }
 }, {
   timestamps: true
