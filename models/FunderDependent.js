@@ -12,6 +12,16 @@ module.exports = (sequelize, DataTypes) => {
     dependentId: {
       type: DataTypes.INTEGER,
       allowNull: false
+    },
+    customName: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      comment: 'Custom name/alias that funder gives to the dependent (can be different from actual name)'
+    },
+    notes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      comment: 'Additional notes about the dependent from the funder\'s perspective'
     }
   });
 

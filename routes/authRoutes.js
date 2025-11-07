@@ -59,8 +59,11 @@ router.post(
     check("password", "Password must be at least 6 characters").isLength({ min: 6 }),
     check("Idnumber", "Valid 13-digit numeric ID number required").isLength({ min: 13, max: 13 }).isNumeric(),
     check("relation", "Relation is required").not().isEmpty().trim(),
+    check("customName", "Custom display name is required").not().isEmpty().isLength({ min: 1, max: 100 }).trim(),
+    check("notes", "Notes are optional").optional().isLength({ max: 500 }).trim(),
   ],
   registerDependent
+  
 );
 
 // GET CURRENT USER

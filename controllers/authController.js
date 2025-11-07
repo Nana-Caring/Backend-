@@ -1,7 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const { User, Account } = require("../models");
+const { User, Account, FunderDependent } = require("../models");
 const { Sequelize, Op } = require('sequelize');
 // Email service removed - frontend handles UI
 // const generateUniqueAccountNumber = require('../utils/generateUniqueAccountNumber');
@@ -139,7 +139,7 @@ exports.register = async (req, res) => {
 // Register dependent (called by caregiver or funder)
 exports.registerDependent = async (req, res) => {
   try {
-    const { firstName, middleName, surname, email, password, Idnumber, relation } = req.body;
+    const { firstName, middleName, surname, email, password, Idnumber, relation, customName, notes } = req.body;
     const userId = req.user.id;
 
     // Validate required fields (middleName is optional)
@@ -189,11 +189,12 @@ exports.registerDependent = async (req, res) => {
       Idnumber,
       relation,
       role: 'dependent',
+      customName: customName || `${firstName} ${surname}`, // Use customName or fallback to real name
       // Set infant/pregnancy fields to default values
       isInfant: false,
       isUnborn: false,
       dateOfBirth: null,
-      parentCaregiverId: caregiverId,
+      parentCaregiverId: userId, // Fixed: should be userId, not caregiverId
       // Explicitly set personal details to null until user edits them
       phoneNumber: null,
       postalAddressLine1: null,
@@ -255,11 +256,55 @@ exports.registerDependent = async (req, res) => {
     console.log(`  - ${subAccounts.length} Sub-accounts: ${subAccounts.map(acc => acc.accountType).join(', ')}`);
     console.log(`  - Total: ${subAccounts.length + 1}/8 accounts created (Basic Needs Coverage)`);
 
+    // Automatically create FunderDependent relationship if registered by funder
+    let funderDependentLink = null;
+    if (registeredBy.role === 'funder') {
+      try {
+        // Check if relationship already exists
+        const existingLink = await FunderDependent.findOne({
+          where: {
+            funderId: registeredBy.id,
+            dependentId: dependent.id
+          }
+        });
+
+        if (!existingLink) {
+          // Create the formal funder-dependent relationship
+          funderDependentLink = await FunderDependent.create({
+            funderId: registeredBy.id,
+            dependentId: dependent.id
+          });
+
+          console.log(`🔗 Automatic funder-dependent relationship created:`);
+          console.log(`   Funder: ${registeredBy.firstName} ${registeredBy.surname} (ID: ${registeredBy.id})`);
+          console.log(`   Dependent: ${dependent.firstName} ${dependent.surname} (ID: ${dependent.id})`);
+          console.log(`   Main Account: ${mainAccount.accountNumber}`);
+          console.log(`   Link ID: ${funderDependentLink.id}`);
+        } else {
+          console.log(`🔗 Funder-dependent relationship already exists (Link ID: ${existingLink.id})`);
+          funderDependentLink = existingLink;
+        }
+      } catch (linkError) {
+        console.error('❌ Failed to create funder-dependent relationship:', linkError);
+        // Don't fail the registration if linking fails - the caregiver relationship in accounts is sufficient
+      }
+    }
+
     // Prepare response data
     const dependentResponse = {
       ...dependent.get({ plain: true }),
       password: undefined,
-      accounts: [mainAccount, ...subAccounts].map(acc => acc.get ? acc.get({ plain: true }) : acc)
+      displayName: dependent.customName, // Highlight the custom name for display
+      accounts: [mainAccount, ...subAccounts].map(acc => acc.get ? acc.get({ plain: true }) : acc),
+      // Include linking information if funder registered the dependent
+      ...(registeredBy.role === 'funder' && funderDependentLink && {
+        funderLink: {
+          linkId: funderDependentLink.id,
+          funderName: `${registeredBy.firstName} ${registeredBy.surname}`,
+          mainAccountNumber: mainAccount.accountNumber,
+          linkedAt: funderDependentLink.createdAt || new Date()
+        }
+      })
     };
 
     // Send welcome email with login credentials
@@ -338,8 +383,10 @@ exports.getDependents = async (req, res) => {
     const dependentsMap = new Map();
     dependentAccounts.forEach(account => {
       if (account.user && !dependentsMap.has(account.user.id)) {
+        const userData = account.user.toJSON();
         dependentsMap.set(account.user.id, {
-          ...account.user.toJSON(),
+          ...userData,
+          displayName: userData.customName || `${userData.firstName} ${userData.surname}`, // Show custom name
           accounts: []
         });
       }

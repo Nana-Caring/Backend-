@@ -224,6 +224,13 @@ const User = sequelize.define('User', {
     type: DataTypes.BIGINT,
     allowNull: true,
     comment: 'Expiration timestamp for reset token'
+  },
+  customName: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    validate: {
+      len: [1, 100]
+    }
   }
 }, {
   timestamps: true
