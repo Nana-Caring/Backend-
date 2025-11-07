@@ -10,12 +10,12 @@ exports.getMyBeneficiaries = async (req, res) => {
         {
           model: db.User,
           as: 'dependent',
-          attributes: ['id', 'firstName', 'middleName', 'email'],
+          attributes: ['id', 'firstName', 'middleName', 'surname', 'email', 'phoneNumber'],
           include:[
             {
               model: db.Account,
-              as: 'accounts',
-              attributes: ['accountNumber', 'accountType']
+              as: 'Accounts',
+              attributes: ['id', 'accountType', 'accountNumber', 'balance', 'caregiverId']
             }
           ]
         }
@@ -24,16 +24,27 @@ exports.getMyBeneficiaries = async (req, res) => {
     
    const beneficiaries = linkedDependents.map(entry => {
     const dep = entry.dependent;
-    const account = dep.accounts && dep.accounts[0];
     return {
-    id: dep.id,
-    firstName: dep.firstName,
-    middleName: dep.middleName,
-    email: dep.email,
-    accountNumber: account ? account.accountNumber : null,
-    accountType: account ? account.accountType : null
-  };
-});
+      id: dep.id,
+      name: `${dep.firstName} ${dep.middleName || ''} ${dep.surname || ''}`.trim(),
+      firstName: dep.firstName,
+      middleName: dep.middleName,
+      surname: dep.surname,
+      email: dep.email,
+      phoneNumber: dep.phoneNumber,
+      // Include custom name from relationship
+      customName: entry.customName,
+      displayName: entry.customName || `${dep.firstName} ${dep.surname}`,
+      Accounts: (dep.Accounts || []).map(account => ({
+        id: account.id,
+        accountName: account.accountType,
+        accountNumber: account.accountNumber,
+        accountType: account.accountType,
+        balance: `ZAR ${parseFloat(account.balance || 0).toFixed(2)}`,
+        caregiverId: account.caregiverId
+      }))
+    };
+  });
 
     res.status(200).json({ beneficiaries });
   } catch (error) {
