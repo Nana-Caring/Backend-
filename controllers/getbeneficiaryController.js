@@ -11,12 +11,9 @@ exports.getMyBeneficiaries = async (req, res) => {
           model: db.User,
           as: 'dependent',
           attributes: ['id', 'firstName', 'middleName', 'surname', 'email', 'phoneNumber'],
-          attributes: ['id', 'firstName', 'middleName', 'surname', 'email', 'phoneNumber'],
-          include:[
+          include: [
             {
               model: db.Account,
-              as: 'Accounts',
-              attributes: ['id', 'accountType', 'accountNumber', 'balance', 'caregiverId']
               as: 'Accounts',
               attributes: ['id', 'accountType', 'accountNumber', 'balance', 'caregiverId']
             }

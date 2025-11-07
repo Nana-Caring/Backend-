@@ -11,66 +11,24 @@ exports.linkDependent = async (req, res) => {
     console.log("Custom name:", customName);
     console.log("Account number:", accountNumber);
     
-    // Find dependent by name and account number - completely avoid Sequelize associations
-    const nameParts = dependentName.split(' ');
-    const firstName = nameParts[0];
-    const surname = nameParts[nameParts.length - 1];
-    
-    console.log('Searching for user with firstName:', firstName, 'surname:', surname);
-    console.log('Looking for account number:', accountNumber);
-    
-    // Use raw SQL to avoid Sequelize association issues completely
-    const userQuery = `
-      SELECT u.* FROM "Users" u 
-      WHERE u."firstName" = ? AND u."surname" = ? AND u."role" = 'dependent'
-    `;
-    
-    const users = await sequelize.query(userQuery, {
-      replacements: [firstName, surname],
-      type: sequelize.QueryTypes.SELECT
+    // Find dependent by account number (more reliable than name matching)
+    const dependent = await db.User.findOne({
+      where: { role: 'dependent' },
+      include: [{
+        model: db.Account,
+        as: 'accounts',
+        where: { accountNumber }
+      }]
     });
 
-    if (users.length === 0) {
-      console.log('User not found with name:', dependentName);
-      return res.status(404).json({ message: `User with name ${dependentName} not found` });
+    if (!dependent) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Dependent not found with that account number' 
+      });
     }
 
-    const dependent = users[0];
-    console.log('Found user:', dependent.id, dependent.firstName, dependent.surname);
-
-    // Find the account using raw SQL
-    const accountQuery = `
-      SELECT a.* FROM "Accounts" a 
-      WHERE a."userId" = ? AND a."accountNumber" = ?
-    `;
-    
-    const accounts = await sequelize.query(accountQuery, {
-      replacements: [dependent.id, accountNumber],
-      type: sequelize.QueryTypes.SELECT
-    });
-
-    if (accounts.length === 0) {
-      console.log('Account not found for user with account number:', accountNumber);
-      return res.status(404).json({ message: `Account number ${accountNumber} not found for this user` });
-    }
-
-    const account = accounts[0];
-    console.log('Found account:', account.id, account.accountNumber, account.accountType);
-
-    // Check if already linked
-    const existingLinkQuery = `
-      SELECT * FROM "FunderDependents" 
-      WHERE "funderId" = ? AND "dependentId" = ?
-    `;
-    
-    const existingLinks = await sequelize.query(existingLinkQuery, {
-      replacements: [funderId, dependent.id],
-      type: sequelize.QueryTypes.SELECT
-    });
-
-    if (existingLinks.length > 0) {
-      return res.status(400).json({ message: 'This dependent is already linked to your account' });
-    }
+    console.log('Found dependent:', dependent.id, dependent.firstName, dependent.surname);
 
     // Check if already linked
     const existingLink = await db.FunderDependent.findOne({

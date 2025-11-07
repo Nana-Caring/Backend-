@@ -7,6 +7,9 @@ const beneficiaryController = require('../controllers/getbeneficiaryController')
 // Link dependent/beneficiary
 router.post('/link-dependent', authMiddleware, funderController.linkDependent);
 
+// Search dependent by custom name
+router.get('/search-dependent', authMiddleware, funderController.searchDependentByCustomName);
+
 // Get all beneficiaries of a funder
 router.get('/get-beneficiaries', authMiddleware, beneficiaryController.getMyBeneficiaries);
 
