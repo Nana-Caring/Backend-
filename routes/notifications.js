@@ -3,7 +3,7 @@ const router = express.Router();
 const NotificationService = require('../services/notificationService');
 const UserDevice = require('../models/UserDevice');
 const NotificationPreference = require('../models/NotificationPreference');
-const { authMiddleware } = require('../middleware/auth');
+const authMiddleware = require('../middlewares/auth');
 
 // 📱 Device Management
 

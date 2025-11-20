@@ -16,6 +16,12 @@ class SimplePushService {
 
   initializeFirebase() {
     try {
+      // Skip Firebase initialization if required env vars are missing
+      if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
+        console.log('🔥 Firebase FCM skipped - missing environment variables');
+        return;
+      }
+
       if (!admin.apps.length) {
         const serviceAccount = {
           type: "service_account",
@@ -37,27 +43,32 @@ class SimplePushService {
       this.fcm = admin.messaging();
       console.log('🔥 Firebase FCM initialized');
     } catch (error) {
-      console.error('❌ Firebase FCM initialization failed:', error);
+      console.error('❌ Firebase FCM initialization failed:', error.message);
+      // Don't crash the server, just disable Firebase notifications
       this.fcm = null;
     }
   }
 
   initializeOneSignal() {
     try {
-      if (process.env.ONESIGNAL_APP_ID && process.env.ONESIGNAL_API_KEY) {
-        this.oneSignal = new Client({
-          userKey: process.env.ONESIGNAL_USER_AUTH_KEY,
-          appKey: process.env.ONESIGNAL_API_KEY,
-        });
-        this.oneSignalAppId = process.env.ONESIGNAL_APP_ID;
-        console.log('🟠 OneSignal initialized');
-      } else {
-        console.log('⚠️ OneSignal credentials missing - skipping OneSignal init');
+      // Skip OneSignal initialization if required env vars are missing
+      if (!process.env.ONESIGNAL_APP_ID || !process.env.ONESIGNAL_API_KEY) {
+        console.log('🟠 OneSignal skipped - missing environment variables');
         this.oneSignal = null;
+        return;
       }
+
+      this.oneSignal = new Client({
+        userKey: process.env.ONESIGNAL_USER_AUTH_KEY,
+        appKey: process.env.ONESIGNAL_API_KEY,
+      });
+      this.oneSignalAppId = process.env.ONESIGNAL_APP_ID;
+      console.log('🟠 OneSignal initialized');
     } catch (error) {
-      console.error('❌ OneSignal initialization failed:', error);
+      console.error('❌ OneSignal initialization failed:', error.message);
+      // Don't crash the server, just disable OneSignal notifications
       this.oneSignal = null;
+    }
     }
   }
 
