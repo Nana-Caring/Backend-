@@ -69,7 +69,6 @@ class SimplePushService {
       // Don't crash the server, just disable OneSignal notifications
       this.oneSignal = null;
     }
-    }
   }
 
   initializeExpo() {
