@@ -44,6 +44,9 @@ const Product = require('./Product')(sequelize, Sequelize.DataTypes);
 const Cart = require('./Cart')(sequelize, Sequelize.DataTypes);
 const Order = require('./Order')(sequelize, Sequelize.DataTypes);
 const OrderItem = require('./OrderItem')(sequelize, Sequelize.DataTypes);
+const Notification = require('./Notification');
+const NotificationPreference = require('./NotificationPreference');
+const UserDevice = require('./UserDevice');
 
 const models = {
     User,
@@ -54,7 +57,10 @@ const models = {
     Product,
     Cart,
     Order,
-    OrderItem
+    OrderItem,
+    Notification,
+    NotificationPreference,
+    UserDevice
 };
 
 // Set up associations
@@ -216,6 +222,39 @@ Order.hasMany(OrderItem, {
 Product.hasMany(OrderItem, {
     foreignKey: 'productId',
     as: 'orderItems'
+});
+
+// Notification associations
+Notification.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user'
+});
+
+User.hasMany(Notification, {
+    foreignKey: 'userId',
+    as: 'notifications'
+});
+
+// NotificationPreference associations
+NotificationPreference.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user'
+});
+
+User.hasMany(NotificationPreference, {
+    foreignKey: 'userId',
+    as: 'notificationPreferences'
+});
+
+// UserDevice associations
+UserDevice.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user'
+});
+
+User.hasMany(UserDevice, {
+    foreignKey: 'userId',
+    as: 'devices'
 });
 
 // Test connection
