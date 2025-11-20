@@ -15,7 +15,7 @@ When a funder registers a dependent using `POST /api/auth/register-dependent`:
 - ✅ **Duplicate Prevention**: Checks for existing relationships
 
 ### 2. **Enhanced Response Format**
-```json
+```jsonh
 {
   "message": "Dependent registered successfully",
   "dependent": {
